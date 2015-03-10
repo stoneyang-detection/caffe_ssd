@@ -55,6 +55,8 @@ class NetTest : public MultiDeviceTest<TypeParam> {
     }
   }
 
+
+
   virtual void InitTinyNet(const bool force_backward = false,
                            const bool accuracy_layer = false) {
     string proto =
@@ -610,6 +612,103 @@ class NetTest : public MultiDeviceTest<TypeParam> {
         "  bottom: 'norm1' "
         "  top: 'softmax' "
         "} ";
+    InitNetFromProtoString(proto);
+  }
+
+  virtual void InitSkipPropNet(bool test_skip_true) {
+    const string proto =
+      "name: 'SkipPropTestNetwork' "
+      "layer { "
+      "  name: 'data' "
+      "  type: 'DummyData' "
+      "  dummy_data_param { "
+      "    shape { "
+      "      dim: 5 "
+      "      dim: 2 "
+      "      dim: 3 "
+      "      dim: 4 "
+      "    } "
+      "    data_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    shape { "
+      "      dim: 5 "
+      "    } "
+      "    data_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  top: 'data' "
+      "  top: 'label' "
+      "} "
+      "layer { "
+      "  name: 'silence' "
+      "  bottom: 'label' "
+      "  type: 'Silence' "
+      "} "
+      "layer { "
+      "  name: 'innerproduct' "
+      "  type: 'InnerProduct' "
+      "  inner_product_param { "
+      "    num_output: 1 "
+      "    weight_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    bias_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  param { "
+      "    lr_mult: 1 "
+      "    decay_mult: 1 "
+      "  } "
+      "  param { "
+      "    lr_mult: 2 "
+      "    decay_mult: 0 "
+      "  } "
+      "  bottom: 'data' "
+      "  top: 'innerproduct' "
+      "} "
+      "layer { "
+      "  name: 'ip_fake_labels' "
+      "  type: 'InnerProduct' "
+      "  inner_product_param { "
+      "    num_output: 1 "
+      "    weight_filler { "
+      "      type: 'gaussian' "
+      "      std: 0.01 "
+      "    } "
+      "    bias_filler { "
+      "      type: 'constant' "
+      "      value: 0 "
+      "    } "
+      "  } "
+      "  bottom: 'data' "
+      "  top: 'fake_labels' "
+      "} "
+      "layer { "
+      "  name: 'argmax' "
+      "  bottom: 'fake_labels' "
+      "  top: 'label_argmax' "
+      "  type: 'ArgMax' "
+      "} "
+      "layer { "
+      "  name: 'loss' "
+      "  bottom: 'innerproduct' "
+      "  bottom: 'label_argmax' ";
+    if (test_skip_true)
+      proto += "  skip_propagate_down: [false, true] ";
+    else
+      proto += "  skip_propagate_down: [false, false] ";
+    proto +=
+      "  top: 'cross_entropy_loss' "
+      "  type: 'SigmoidCrossEntropyLoss' "
+      "  loss_weight: 0.1 "
+      "} ";
     InitNetFromProtoString(proto);
   }
 
@@ -2221,6 +2320,34 @@ TYPED_TEST(NetTest, TestReshape) {
   this->net_->Backward();
   for (int i = 0; i < output2.count(); ++i) {
     CHECK_EQ(*(output2.cpu_data() + i), *(output_blob->cpu_data() + i));
+  }
+}
+
+TYPED_TEST(NetTest, TestSkipPropagateDown) {
+  typedef typename TypeParam::Dtype Dtype;
+  // check bottom_need_backward if skip_propagat_down is false
+  this->InitSkipPropNet(false);
+  for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
+    if (this->net_->layer_names()[layer_id] == "loss") {
+      // access to bottom_need_backward coresponding to label's blob
+      bool need_back = this->net_->bottom_need_backward()[layer_id][1];
+      // if skip_propagate_down is false, the loss layer will try to
+      // backpropagate on labels
+      CHECK_EQ(need_back, true)
+        << "bottom_need_backward should be True";
+    }
+  }
+  // check bottom_need_backward if skip_propagat_down is true
+  this->InitSkipPropNet(true);
+  for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
+    if (this->net_->layer_names()[layer_id] == "loss") {
+      // access to bottom_need_backward coresponding to label's blob
+      bool need_back = this->net_->bottom_need_backward()[layer_id][1];
+      // if skip_propagate_down is true, the loss layer will not try to
+      // backpropagate on labels
+      CHECK_EQ(need_back, false)
+        << "bottom_need_backward should be False";
+    }
   }
 }
 
