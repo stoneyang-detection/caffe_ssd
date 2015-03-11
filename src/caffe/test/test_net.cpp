@@ -616,7 +616,7 @@ class NetTest : public MultiDeviceTest<TypeParam> {
   }
 
   virtual void InitSkipPropNet(bool test_skip_true) {
-    const string proto =
+    string proto =
       "name: 'SkipPropTestNetwork' "
       "layer { "
       "  name: 'data' "
@@ -2324,7 +2324,6 @@ TYPED_TEST(NetTest, TestReshape) {
 }
 
 TYPED_TEST(NetTest, TestSkipPropagateDown) {
-  typedef typename TypeParam::Dtype Dtype;
   // check bottom_need_backward if skip_propagat_down is false
   this->InitSkipPropNet(false);
   for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
