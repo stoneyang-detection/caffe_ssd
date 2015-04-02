@@ -55,8 +55,6 @@ class NetTest : public MultiDeviceTest<TypeParam> {
     }
   }
 
-
-
   virtual void InitTinyNet(const bool force_backward = false,
                            const bool accuracy_layer = false) {
     string proto =
@@ -701,9 +699,9 @@ class NetTest : public MultiDeviceTest<TypeParam> {
       "  bottom: 'innerproduct' "
       "  bottom: 'label_argmax' ";
     if (test_skip_true)
-      proto += "  skip_propagate_down: [false, true] ";
+      proto += "  propagate_down: [true, false] ";
     else
-      proto += "  skip_propagate_down: [false, false] ";
+      proto += "  propagate_down: [true, true] ";
     proto +=
       "  top: 'cross_entropy_loss' "
       "  type: 'SigmoidCrossEntropyLoss' "
@@ -2324,29 +2322,50 @@ TYPED_TEST(NetTest, TestReshape) {
 }
 
 TYPED_TEST(NetTest, TestSkipPropagateDown) {
-  // check bottom_need_backward if skip_propagat_down is false
+  // check bottom_need_backward if propagate_down is true
   this->InitSkipPropNet(false);
+  vector<bool> vec_layer_need_backward = this->net_->layer_need_backward();
   for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
     if (this->net_->layer_names()[layer_id] == "loss") {
       // access to bottom_need_backward coresponding to label's blob
       bool need_back = this->net_->bottom_need_backward()[layer_id][1];
-      // if skip_propagate_down is false, the loss layer will try to
+      // if propagate_down is true, the loss layer will try to
       // backpropagate on labels
       CHECK_EQ(need_back, true)
         << "bottom_need_backward should be True";
     }
+    if (this->net_->layer_names()[layer_id] == "ip_fake_labels")
+      CHECK_EQ(vec_layer_need_backward[layer_id], true)
+        << "layer_need_backward for ip_fake_labels should be True";
+    if (this->net_->layer_names()[layer_id] == "argmax")
+      CHECK_EQ(vec_layer_need_backward[layer_id], true)
+        << "layer_need_backward for argmax should be True";
+    if (this->net_->layer_names()[layer_id] == "innerproduct")
+      CHECK_EQ(vec_layer_need_backward[layer_id], true)
+        << "layer_need_backward for innerproduct should be True";
   }
-  // check bottom_need_backward if skip_propagat_down is true
+  // check bottom_need_backward if propagat_down is false
   this->InitSkipPropNet(true);
+  vec_layer_need_backward.clear();
+  vec_layer_need_backward = this->net_->layer_need_backward();
   for (int layer_id = 0; layer_id < this->net_->layers().size(); ++layer_id) {
     if (this->net_->layer_names()[layer_id] == "loss") {
       // access to bottom_need_backward coresponding to label's blob
       bool need_back = this->net_->bottom_need_backward()[layer_id][1];
-      // if skip_propagate_down is true, the loss layer will not try to
+      // if propagate_down is false, the loss layer will not try to
       // backpropagate on labels
       CHECK_EQ(need_back, false)
         << "bottom_need_backward should be False";
     }
+    if (this->net_->layer_names()[layer_id] == "ip_fake_labels")
+      CHECK_EQ(vec_layer_need_backward[layer_id], false)
+        << "layer_need_backward for ip_fake_labels should be False";
+    if (this->net_->layer_names()[layer_id] == "argmax")
+      CHECK_EQ(vec_layer_need_backward[layer_id], false)
+        << "layer_need_backward for argmax should be False";
+    if (this->net_->layer_names()[layer_id] == "innerproduct")
+      CHECK_EQ(vec_layer_need_backward[layer_id], true)
+        << "layer_need_backward for innerproduct should be True";
   }
 }
 
