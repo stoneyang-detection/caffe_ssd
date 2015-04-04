@@ -9,6 +9,9 @@
 namespace caffe {
 
 template <typename Dtype>
+Blob<Dtype> BaseConvolutionLayer<Dtype>::col_buffer_;
+
+template <typename Dtype>
 void BaseConvolutionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   CHECK_EQ(4, bottom[0]->num_axes()) << "Input must have 4 axes, "
