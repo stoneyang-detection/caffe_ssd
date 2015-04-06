@@ -37,7 +37,6 @@ void ParseOutputLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   Dtype* max_prob_data = max_prob_.mutable_cpu_data();
   int num = bottom[0]->num();
   int channels = bottom[0]->channels();
-  int dim = bottom[0]->count() / bottom[0]->num();
   int spatial_dim = bottom[0]->height() * bottom[0]->width();
   for (int i = 0; i < num; ++i) {
     caffe_set(spatial_dim, Dtype(0), top_label_data);
