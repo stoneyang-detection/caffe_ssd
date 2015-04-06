@@ -49,6 +49,7 @@ class Solver {
   // The test routine
   void TestAll();
   void Test(const int test_net_id = 0);
+  void TestSegmentation(const int test_net_id = 0);
   virtual void SnapshotSolverState(SolverState* state) = 0;
   virtual void RestoreSolverState(const SolverState& state) = 0;
   void DisplayOutputBlobs(const int net_id);
