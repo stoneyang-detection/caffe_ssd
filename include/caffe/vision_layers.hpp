@@ -500,6 +500,57 @@ class CropLayer : public Layer<Dtype> {
   int crop_h_, crop_w_;
 };
 
+/**
+ * @brief UnPools the input image by assigning fixed, bilinear interpolation,
+ * etc. within regions.
+ *
+ * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ */
+template <typename Dtype>
+class UnPoolingLayer : public Layer<Dtype> {
+ public:
+  explicit UnPoolingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "UnPooling"; }
+  virtual inline int MinBottomBlobs() const { return 1; }
+  virtual inline int MaxBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return FilterMap<Dtype>(out_kernel_h_, out_kernel_w_, out_stride_h_,
+                            out_stride_w_, out_pad_h_, out_pad_w_);
+  }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  int out_kernel_h_, out_kernel_w_;
+  int out_stride_h_, out_stride_w_;
+  int out_pad_h_, out_pad_w_;
+  int channels_;
+  int height_, width_;
+  int unpooled_height_, unpooled_width_;
+  Blob<int> fixed_idx_;
+  Blob<Dtype> group_blob_;
+  Blob<Dtype> group_mean_;
+  vector<vector<map<int, vector<int> > > > group_maps_vec_;
+
+  // used in gpu code
+  Blob<int> group_map_range_;
+  Blob<int> group_map_index_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_
