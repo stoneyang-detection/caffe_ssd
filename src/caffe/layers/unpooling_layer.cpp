@@ -397,7 +397,6 @@ void UnPoolingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   // Different unpooling methods. We explicitly do the switch outside the for
   // loop to save time, although this results in more codes.
   const int* mask = mask_.cpu_data();
-  int group_channels;
   switch (this->layer_param_.unpooling_param().unpool()) {
   case UnPoolingParameter_UnPoolMethod_FIXED:
     // The main loop
