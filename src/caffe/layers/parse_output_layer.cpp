@@ -44,14 +44,14 @@ void ParseOutputLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     caffe_copy(spatial_dim, bottom_data, max_prob_data);
     for (int j = 1; j < channels; ++j) {
       for (int k = 0; k < spatial_dim; ++k) {
-        Dtype prob = bottom_data[j * spatial_dim + k];
+        Dtype prob = bottom_data[k];
         if (prob > max_prob_data[k]) {
           max_prob_data[k] = prob;
           top_label_data[k] = j;
         }
       }
+      bottom_data += bottom[0]->offset(0, 1);
     }
-    bottom_data += bottom[0]->offset(1);
     top_label_data += top[0]->offset(1);
     if (out_max_val_) {
       caffe_copy(spatial_dim, max_prob_data, top_prob_data);
