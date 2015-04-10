@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cfloat>
 #include <vector>
-#include <limits>
 
 #include "thrust/device_vector.h"
 
@@ -17,27 +16,35 @@ void NormalizeLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* bottom_data = bottom[0]->gpu_data();
   Dtype* top_data = top[0]->mutable_gpu_data();
   Dtype* squared_data = squared_.mutable_gpu_data();
-  Dtype* norm_data = norm_.mutable_gpu_data();
-  caffe_gpu_set(norm_.count(), Dtype(0), norm_data);
-  Dtype normsqr;
+  Dtype* norm_data;
+  if (across_spatial_) {
+    // need to index it
+    norm_data = norm_.mutable_cpu_data();
+  } else {
+    norm_data = norm_.mutable_gpu_data();
+    caffe_gpu_set(norm_.count(), Dtype(0), norm_data);
+  }
   int num = bottom[0]->num();
   int dim = bottom[0]->count() / num;
   int spatial_dim = bottom[0]->height() * bottom[0]->width();
   int channels = bottom[0]->channels();
   // add eps to avoid overflow
-  Dtype eps = std::numeric_limits<Dtype>::epsilon();
+  Dtype eps = 1e-10;
   for (int n = 0; n < num; ++n) {
     caffe_gpu_powx<Dtype>(dim, bottom_data, Dtype(2), squared_data);
     if (across_spatial_) {
+      Dtype normsqr;
       caffe_gpu_asum<Dtype>(dim, squared_data, &normsqr);
-      caffe_gpu_scale<Dtype>(dim, Dtype(1)/(pow(normsqr, Dtype(0.5))+eps),
-          bottom_data, top_data);
+      norm_data[n] = pow(normsqr, Dtype(0.5)) + eps;
+      caffe_gpu_scale<Dtype>(dim, Dtype(1)/norm_data[n], bottom_data, top_data);
     } else {
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_add<Dtype>(spatial_dim, squared_data+c*spatial_dim, norm_data,
             norm_data);
       }
       caffe_gpu_powx<Dtype>(spatial_dim, norm_data, Dtype(0.5), norm_data);
+      // add eps to avoid overflow
+      caffe_gpu_add_scalar<Dtype>(spatial_dim, eps, norm_data);
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_div<Dtype>(spatial_dim, bottom_data+c*spatial_dim, norm_data,
             top_data+c*spatial_dim);
@@ -56,22 +63,25 @@ void NormalizeLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   const Dtype* top_data = top[0]->gpu_data();
   const Dtype* bottom_data = bottom[0]->mutable_gpu_data();
   Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
-  const Dtype* norm_data = norm_.gpu_data();
+  const Dtype* norm_data;
+  if (across_spatial_) {
+    // need to index it
+    norm_data = norm_.cpu_data();
+  } else {
+    norm_data = norm_.gpu_data();
+  }
   Dtype* squared_data = squared_.mutable_gpu_data();
   int num = top[0]->num();
   int dim = top[0]->count() / num;
   int spatial_dim = top[0]->height() * top[0]->width();
   int channels = top[0]->channels();
-  Dtype eps = std::numeric_limits<Dtype>::epsilon();
   for (int n = 0; n < num; ++n) {
     if (across_spatial_) {
       Dtype a;
       caffe_gpu_dot<Dtype>(dim, top_data, top_diff, &a);
       caffe_gpu_scale<Dtype>(dim, a, top_data, bottom_diff);
       caffe_gpu_sub<Dtype>(dim, top_diff, bottom_diff, bottom_diff);
-      caffe_gpu_dot<Dtype>(dim, bottom_data, bottom_data, &a);
-      caffe_gpu_scale<Dtype>(dim, Dtype(1)/(pow(a,Dtype(0.5))+eps), bottom_diff,
-          bottom_diff);
+      caffe_gpu_scale<Dtype>(dim, Dtype(1)/norm_data[n], bottom_diff, bottom_diff);
     } else {
       // use squared_data to store temp result
       // dot product between top_data and top_diff

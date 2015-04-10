@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <vector>
 #include <cmath>
-#include <limits>
 
 #include "caffe/layer.hpp"
 #include "caffe/util/math_functions.hpp"
@@ -35,7 +34,7 @@ void NormalizeLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   int dim = bottom[0]->count() / num;
   int spatial_dim = bottom[0]->height() * bottom[0]->width();
   int channels = bottom[0]->channels();
-  Dtype eps = std::numeric_limits<Dtype>::epsilon();
+  Dtype eps = 1e-10;
   for (int n = 0; n < num; ++n) {
     caffe_sqr<Dtype>(dim, bottom_data, squared_data);
     if (across_spatial_) {
