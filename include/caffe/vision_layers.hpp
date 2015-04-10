@@ -535,13 +535,16 @@ class UnPoolingLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
+  // fill mask for different unpool type
+  void FillMask();
+
   int out_kernel_h_, out_kernel_w_;
   int out_stride_h_, out_stride_w_;
   int out_pad_h_, out_pad_w_;
-  int channels_;
+  int num_, channels_, group_channels_;
   int height_, width_;
   int unpooled_height_, unpooled_width_;
-  Blob<int> fixed_idx_;
+  Blob<int> mask_;
   Blob<Dtype> group_blob_;
   Blob<Dtype> group_mean_;
   vector<vector<map<int, vector<int> > > > group_maps_vec_;

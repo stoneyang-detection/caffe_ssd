@@ -131,8 +131,8 @@ TYPED_TEST(UnPoolingLayerTest, TestSetupAuto3) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
-  unpooling_param->set_out_kernel_size(3);
-  unpooling_param->set_out_stride(2);
+  unpooling_param->set_out_kernel_size(100);
+  unpooling_param->set_out_stride(100);
   UnPoolingLayer<Dtype> layer(layer_param);
 
   Blob<Dtype>* unpool_blob(new Blob<Dtype>());
@@ -513,6 +513,63 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardDiv) {
   unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_DIV);
   const int num = 2;
   const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 2);
+  //     [1 2]
+  //     [9 4]
+  //     [5 3]
+  for (int i = 0; i < 6 * num * channels; i += 6) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 3;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 5);
+  EXPECT_EQ(this->blob_top_->width(), 4);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  Dtype epsilon = 1e-5;
+  //     [1.0  1.5  1.5 2.0]
+  //     [5.0  4.0  4.0 3.0]
+  //     [5.0  4.0  4.0 3.0] / 9.0
+  //     [7.0 5.25 5.25 3.5]
+  //     [5.0  4.0  4.0 3.0]
+  for (int i = 0; i < 20 * num * channels; i += 20) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 1.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 7.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 5.25/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 5.25/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 3.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 3.0/9, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardDivConst) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_DIV);
+  const int num = 2;
+  const int channels = 2;
   this->blob_bottom_->Reshape(num, channels, 3, 3);
   FillerParameter filler_param;
   filler_param.set_value(Dtype(2));
@@ -526,36 +583,87 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardDiv) {
   EXPECT_EQ(this->blob_top_->width(), 5);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   Dtype epsilon = 1e-5;
-  for (int i = 0; i < 25 * num * channels; i += 25) {
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 6.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 12.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 6.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 12.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 18.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 12.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 6.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 12.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 6.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 2.0/9, epsilon);
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i], 2.0/9, epsilon);
   }
 }
 
 TYPED_TEST(UnPoolingLayerTest, TestForwardDivStrided) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_out_stride(2);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_DIV);
+  const int num = 2;
+  const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 2);
+  //     [1 2]
+  //     [9 4]
+  //     [5 3]
+  for (int i = 0; i < 6 * num * channels; i += 6) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 3;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 7);
+  EXPECT_EQ(this->blob_top_->width(), 5);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  //     [1.0 1.0  1.5  2.0 2.0]
+  //     [1.0 1.0  1.5  2.0 2.0]
+  //     [5.0 5.0  4.0  3.0 3.0]
+  //     [9.0 9.0  6.5  4.0 4.0] / 9.0
+  //     [7.0 7.0 5.25  3.5 3.5]
+  //     [5.0 5.0  4.0  3.0 3.0]
+  //     [5.0 5.0  4.0  3.0 3.0]
+  Dtype epsilon = 1e-5;
+  for (int i = 0; i < 35 * num * channels; i += 35) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 1.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 1.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 6.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 7.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 7.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 5.25/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 3.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 3.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+25], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+26], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+27], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+28], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+29], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+30], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+31], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+32], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+33], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+34], 3.0/9, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardDivStridedConst) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
@@ -577,56 +685,8 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardDivStrided) {
   EXPECT_EQ(this->blob_top_->width(), 7);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   Dtype epsilon = 1e-5;
-  for (int i = 0; i < 49 * num * channels; i += 49) {
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+25], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+26], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+27], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+28], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+29], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+30], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+31], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+32], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+33], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+34], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+35], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+36], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+37], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+38], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+39], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+40], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+41], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+42], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+43], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+44], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+45], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+46], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+47], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+48], 2.0/9, epsilon);
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i], 2.0/9, epsilon);
   }
 }
 
@@ -640,6 +700,60 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardDivPadded) {
   unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_DIV);
   const int num = 2;
   const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 2);
+  //     [1 2]
+  //     [9 4]
+  //     [5 3]
+  for (int i = 0; i < 6 * num * channels; i += 6) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 3;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 5);
+  EXPECT_EQ(this->blob_top_->width(), 3);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  //     [1.0  1.5  2.0]
+  //     [5.0  4.0  3.0]
+  //     [9.0  6.5  4.0]  / 9.0
+  //     [7.0 5.25  3.5]
+  //     [5.0  4.0  3.0]
+  Dtype epsilon = 1e-5;
+  for (int i = 0; i < 15 * num * channels; i += 15) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 6.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 7.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 5.25/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 3.5/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 3.0/9, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardDivPaddedConst) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_out_stride(2);
+  unpooling_param->set_out_pad(1);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_DIV);
+  const int num = 2;
+  const int channels = 2;
   this->blob_bottom_->Reshape(num, channels, 3, 3);
   FillerParameter filler_param;
   filler_param.set_value(Dtype(2));
@@ -653,36 +767,162 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardDivPadded) {
   EXPECT_EQ(this->blob_top_->width(), 5);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   Dtype epsilon = 1e-5;
-  for (int i = 0; i < 25 * num * channels; i += 25) {
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 4.0/9, epsilon);
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i], 2.0/9, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardDivSquare) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_out_stride(3);
+  unpooling_param->set_out_pad(1);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_DIV);
+  const int num = 2;
+  const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 3);
+  //     [1 2 8]
+  //     [9 4 6]
+  //     [5 3 0]
+  for (int i = 0; i < 9 * num * channels; i += 9) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 8;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 6;
+    this->blob_bottom_->mutable_cpu_data()[i +  6] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  7] = 3;
+    this->blob_bottom_->mutable_cpu_data()[i +  8] = 0;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 7);
+  EXPECT_EQ(this->blob_top_->width(), 7);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  Dtype epsilon = 1e-5;
+  //     [1 1 2 2 2 8 8]
+  //     [1 1 2 2 2 8 8]
+  //     [9 9 4 4 4 6 6]
+  //     [9 9 4 4 4 6 6] / 9.0
+  //     [9 9 4 4 4 6 6]
+  //     [5 5 3 3 3 0 0]
+  //     [5 5 3 3 3 0 0]
+  for (int i = 0; i < 49 * num * channels; i += 49) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.0/9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2.0/9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 8.0/9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 1.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 2.0/9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 8.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 8.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 8.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 4.0/9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 8.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 2.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 6.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 6.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 9.0/9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 4.0/9, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 2.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+25], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+26], 6.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+27], 6.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+28], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+29], 9.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+30], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+31], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+32], 4.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+33], 6.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+34], 6.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+35], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+36], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+37], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+38], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+39], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+40], 0.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+41], 0.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+42], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+43], 5.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+44], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+45], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+46], 3.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+47], 0.0/9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+48], 0.0/9, epsilon);
   }
 }
 
 TYPED_TEST(UnPoolingLayerTest, TestForwardRep) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_REP);
+  const int num = 2;
+  const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 2);
+  //     [1 2]
+  //     [9 4]
+  //     [5 3]
+  for (int i = 0; i < 6 * num * channels; i += 6) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 3;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 5);
+  EXPECT_EQ(this->blob_top_->width(), 4);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  Dtype epsilon = 1e-5;
+  //     [1.0 1.5 1.5 2.0]
+  //     [5.0 4.0 4.0 3.0]
+  //     [5.0 4.0 4.0 3.0]
+  //     [7.0 5.25 5.25 3.5]
+  //     [5.0 4.0 4.0 3.0]
+  for (int i = 0; i < 20 * num * channels; i += 20) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 1.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 7.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 5.25, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 5.25, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 3.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 3.0, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardRepConst) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
@@ -703,36 +943,87 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardRep) {
   EXPECT_EQ(this->blob_top_->width(), 5);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   Dtype epsilon = 1e-5;
-  for (int i = 0; i < 25 * num * channels; i += 25) {
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 6, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 12, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 6, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 12, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 18, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 12, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 6, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 12, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 6, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 2, epsilon);
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i], 2.0, epsilon);
   }
 }
 
 TYPED_TEST(UnPoolingLayerTest, TestForwardRepStrided) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_out_stride(2);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_REP);
+  const int num = 2;
+  const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 2);
+  //     [1 2]
+  //     [9 4]
+  //     [5 3]
+  for (int i = 0; i < 6 * num * channels; i += 6) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 3;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 7);
+  EXPECT_EQ(this->blob_top_->width(), 5);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  //     [1.0 1.0 1.5 2.0 2.0]
+  //     [1.0 1.0 1.5 2.0 2.0]
+  //     [5.0 5.0 4.0 3.0 3.0]
+  //     [9.0 9.0 6.5 4.0 4.0]
+  //     [7.0 7.0 5.25 3.5 3.5]
+  //     [5.0 5.0 4.0 3.0 3.0]
+  //     [5.0 5.0 4.0 3.0 3.0]
+  Dtype epsilon = 1e-5;
+  for (int i = 0; i < 35 * num * channels; i += 35) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 1.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 2.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 1.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 1.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 1.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 2.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 2.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 9.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 9.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 6.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 7.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 7.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 5.25, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 3.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 3.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+25], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+26], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+27], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+28], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+29], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+30], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+31], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+32], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+33], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+34], 3.0, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardRepStridedConst) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
@@ -754,60 +1045,66 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardRepStrided) {
   EXPECT_EQ(this->blob_top_->width(), 7);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   Dtype epsilon = 1e-5;
-  for (int i = 0; i < 49 * num * channels; i += 49) {
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+25], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+26], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+27], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+28], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+29], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+30], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+31], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+32], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+33], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+34], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+35], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+36], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+37], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+38], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+39], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+40], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+41], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+42], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+43], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+44], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+45], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+46], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+47], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+48], 2, epsilon);
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i], 2.0, epsilon);
   }
 }
 
 TYPED_TEST(UnPoolingLayerTest, TestForwardRepPadded) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_out_stride(2);
+  unpooling_param->set_out_pad(1);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_REP);
+  const int num = 2;
+  const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 2);
+  //     [1 2]
+  //     [9 4]
+  //     [5 3]
+  for (int i = 0; i < 6 * num * channels; i += 6) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 3;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 5);
+  EXPECT_EQ(this->blob_top_->width(), 3);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  //     [1.0 1.5 2.0]
+  //     [5.0 4.0 3.0]
+  //     [9.0 6.5 4.0]
+  //     [7.0 5.25 3.5]
+  //     [5.0 4.0 3.0]
+  Dtype epsilon = 1e-5;
+  for (int i = 0; i < 15 * num * channels; i += 15) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 2.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 3.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 9.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 6.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 7.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 5.25, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 3.5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 5.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 4.0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 3.0, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardRepPaddedConst) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
@@ -830,32 +1127,101 @@ TYPED_TEST(UnPoolingLayerTest, TestForwardRepPadded) {
   EXPECT_EQ(this->blob_top_->width(), 5);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
   Dtype epsilon = 1e-5;
-  for (int i = 0; i < 25 * num * channels; i += 25) {
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 4, epsilon);
+  for (int i = 0; i < this->blob_top_->count(); ++i) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i], 2.0, epsilon);
+  }
+}
+
+TYPED_TEST(UnPoolingLayerTest, TestForwardRepSquare) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  UnPoolingParameter* unpooling_param = layer_param.mutable_unpooling_param();
+  unpooling_param->set_out_kernel_size(3);
+  unpooling_param->set_out_stride(3);
+  unpooling_param->set_out_pad(1);
+  unpooling_param->set_unpool(UnPoolingParameter_UnPoolMethod_REP);
+  const int num = 2;
+  const int channels = 2;
+  this->blob_bottom_->Reshape(num, channels, 3, 3);
+  //     [1 2 8]
+  //     [9 4 6]
+  //     [5 3 0]
+  for (int i = 0; i < 9 * num * channels; i += 9) {
+    this->blob_bottom_->mutable_cpu_data()[i +  0] = 1;
+    this->blob_bottom_->mutable_cpu_data()[i +  1] = 2;
+    this->blob_bottom_->mutable_cpu_data()[i +  2] = 8;
+    this->blob_bottom_->mutable_cpu_data()[i +  3] = 9;
+    this->blob_bottom_->mutable_cpu_data()[i +  4] = 4;
+    this->blob_bottom_->mutable_cpu_data()[i +  5] = 6;
+    this->blob_bottom_->mutable_cpu_data()[i +  6] = 5;
+    this->blob_bottom_->mutable_cpu_data()[i +  7] = 3;
+    this->blob_bottom_->mutable_cpu_data()[i +  8] = 0;
+  }
+  UnPoolingLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  EXPECT_EQ(this->blob_top_->num(), num);
+  EXPECT_EQ(this->blob_top_->channels(), channels);
+  EXPECT_EQ(this->blob_top_->height(), 7);
+  EXPECT_EQ(this->blob_top_->width(), 7);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  Dtype epsilon = 1e-5;
+  //     [1 1 2 2 2 8 8]
+  //     [1 1 2 2 2 8 8]
+  //     [9 9 4 4 4 6 6]
+  //     [9 9 4 4 4 6 6]
+  //     [9 9 4 4 4 6 6]
+  //     [5 5 3 3 3 0 0]
+  //     [5 5 3 3 3 0 0]
+  for (int i = 0; i < 49 * num * channels; i += 49) {
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+0], 1, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+1], 1, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+2], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+3], 2, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+4], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+5], 8, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+6], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+7], 1, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+8], 1, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+9], 2, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+10], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 8, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+11], 2, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+12], 8, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+13], 8, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+14], 9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+15], 9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+16], 4, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+17], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 8, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 2, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 2, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+18], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+19], 6, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+20], 6, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+21], 9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+22], 9, epsilon);
     EXPECT_NEAR(this->blob_top_->cpu_data()[i+23], 4, epsilon);
-    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 2, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+24], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+25], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+26], 6, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+27], 6, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+28], 9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+29], 9, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+30], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+31], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+32], 4, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+33], 6, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+34], 6, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+35], 5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+36], 5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+37], 3, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+38], 3, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+39], 3, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+40], 0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+41], 0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+42], 5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+43], 5, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+44], 3, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+45], 3, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+46], 3, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+47], 0, epsilon);
+    EXPECT_NEAR(this->blob_top_->cpu_data()[i+48], 0, epsilon);
   }
 }
 

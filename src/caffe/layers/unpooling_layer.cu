@@ -10,11 +10,10 @@ namespace caffe {
 
 template <typename Dtype>
 __global__ void FixedUnPoolForward(const int nthreads, const Dtype* bottom_data,
-    const int num, const int channels, const int height,
-    const int width, const int unpooled_height, const int unpooled_width,
-    const int out_kernel_h, const int out_kernel_w, const int out_stride_h,
-    const int out_stride_w, const int out_pad_h, const int out_pad_w,
-    Dtype* top_data, int* mask) {
+    const int num, const int channels, const int height, const int width,
+    const int unpooled_height, const int unpooled_width, const int out_kernel_h,
+    const int out_kernel_w, const int out_stride_h, const int out_stride_w,
+    const int out_pad_h, const int out_pad_w, Dtype* top_data) {
   CUDA_KERNEL_LOOP(unpool_index, nthreads) {
     int uw = unpool_index % unpooled_width;
     int uh = (unpool_index / unpooled_width) % unpooled_height;
@@ -26,8 +25,6 @@ __global__ void FixedUnPoolForward(const int nthreads, const Dtype* bottom_data,
     int wstart = (uw + out_pad_w < out_kernel_w) ? 0 :
       (uw + out_pad_w - out_kernel_w) / out_stride_w + 1;
     int wend = min((uw + out_pad_w) / out_stride_w + 1, width);
-    Dtype val = 0;
-    int index = -1;
     int offset = (n * channels + c) * height * width;
     int unpool_offset = (n * channels + c) * unpooled_height * unpooled_width;
     bottom_data += offset;
@@ -42,19 +39,19 @@ __global__ void FixedUnPoolForward(const int nthreads, const Dtype* bottom_data,
         uhmid = min(max(uhmid, 0), unpooled_height);
         uwmid = min(max(uwmid, 0), unpooled_width);
         if (unpool_offset + uhmid * unpooled_width + uwmid == unpool_index) {
-          index = h * width + w;
-          val = bottom_data[index];
+          // find the mapping, assign & return
+          int index = h * width + w;
+          top_data[unpool_index] = bottom_data[index];
+          return;
         }
       }
     }
-    top_data[unpool_index] = val;
-    mask[unpool_index] = index;
   }
 }
 
 template <typename Dtype>
 __global__ void DivUnPoolForward(const int nthreads, const Dtype* bottom_data,
-    const int num, const int channels, const int height,
+    const int* mask, const int num, const int channels, const int height,
     const int width, const int unpooled_height, const int unpooled_width,
     const int out_kernel_h, const int out_kernel_w, const int out_stride_h,
     const int out_stride_w, const int out_pad_h, const int out_pad_w,
@@ -64,6 +61,7 @@ __global__ void DivUnPoolForward(const int nthreads, const Dtype* bottom_data,
     int uh = (unpool_index / unpooled_width) % unpooled_height + out_pad_h;
     int c = (unpool_index / unpooled_width / unpooled_height) % channels;
     int n = unpool_index / unpooled_width / unpooled_height / channels;
+    int spatial_dim = unpooled_height * unpooled_width;
     int hstart = (uh < out_kernel_h) ? 0 :
       (uh - out_kernel_h) / out_stride_h + 1;
     int hend = min(uh / out_stride_h + 1, height);
@@ -82,13 +80,13 @@ __global__ void DivUnPoolForward(const int nthreads, const Dtype* bottom_data,
         divval += bottom_data[h * width + w] / unpool_size;
       }
     }
-    top_data[unpool_index] = divval;
+    top_data[unpool_index] = divval / mask[unpool_index % spatial_dim];
   }
 }
 
 template <typename Dtype>
 __global__ void RepUnPoolForward(const int nthreads, const Dtype* bottom_data,
-    const int num, const int channels, const int height,
+    const int* mask, const int num, const int channels, const int height,
     const int width, const int unpooled_height, const int unpooled_width,
     const int out_kernel_h, const int out_kernel_w, const int out_stride_h,
     const int out_stride_w, const int out_pad_h, const int out_pad_w,
@@ -98,13 +96,14 @@ __global__ void RepUnPoolForward(const int nthreads, const Dtype* bottom_data,
     int uh = (unpool_index / unpooled_width) % unpooled_height + out_pad_h;
     int c = (unpool_index / unpooled_width / unpooled_height) % channels;
     int n = unpool_index / unpooled_width / unpooled_height / channels;
+    int spatial_dim = unpooled_height * unpooled_width;
     int hstart = (uh < out_kernel_h) ? 0 :
       (uh - out_kernel_h) / out_stride_h + 1;
     int hend = min(uh / out_stride_h + 1, height);
     int wstart = (uw < out_kernel_w) ? 0 : 
       (uw - out_kernel_w) / out_stride_w + 1;
     int wend = min(uw / out_stride_w + 1, width);
-    Dtype divval = 0;
+    Dtype val = 0;
     bottom_data += (n * channels + c) * height * width;
     for (int h = hstart; h < hend; ++h) {
       for (int w = wstart; w < wend; ++w) {
@@ -112,10 +111,10 @@ __global__ void RepUnPoolForward(const int nthreads, const Dtype* bottom_data,
         int uwstart = w * out_stride_w - out_pad_w;
         int uhend = min(uhstart + out_kernel_h, unpooled_height + out_pad_h);
         int uwend = min(uwstart + out_kernel_w, unpooled_width + out_pad_w);
-        divval += bottom_data[h * width + w];
+        val += bottom_data[h * width + w];
       }
     }
-    top_data[unpool_index] = divval;
+    top_data[unpool_index] = val / mask[unpool_index % spatial_dim];
   }
 }
 
@@ -189,42 +188,38 @@ void UnPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   Dtype* top_data = top[0]->mutable_gpu_data();
   const int count = top[0]->count();
   caffe_gpu_set(count, Dtype(0), top_data);
-  const int bottom_count = bottom[0]->count() / bottom[0]->num();
-  int* mask = NULL;
+  const int bottom_count = bottom[0]->count() / num_;
+  const int* mask = mask_.gpu_data();
   switch (this->layer_param_.unpooling_param().unpool()) {
   case UnPoolingParameter_UnPoolMethod_FIXED:
-    mask = fixed_idx_.mutable_gpu_data();
     // NOLINT_NEXT_LINE(whitespace/operators)
     FixedUnPoolForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, bottom_data, bottom[0]->num(), channels_,
-        height_, width_, unpooled_height_, unpooled_width_, out_kernel_h_,
-        out_kernel_w_, out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_,
-        top_data, mask);
+        count, bottom_data, num_, channels_, height_, width_,
+        unpooled_height_, unpooled_width_, out_kernel_h_, out_kernel_w_,
+        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_, top_data);
     break;
   case UnPoolingParameter_UnPoolMethod_DIV:
     // NOLINT_NEXT_LINE(whitespace/operators)
     DivUnPoolForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, bottom_data, bottom[0]->num(), channels_,
-        height_, width_, unpooled_height_, unpooled_width_, out_kernel_h_,
-        out_kernel_w_, out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_,
-        top_data);
+        count, bottom_data, mask, num_, channels_, height_, width_,
+        unpooled_height_, unpooled_width_, out_kernel_h_, out_kernel_w_,
+        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_, top_data);
     break;
   case UnPoolingParameter_UnPoolMethod_REP:
     // NOLINT_NEXT_LINE(whitespace/operators)
     RepUnPoolForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, bottom_data, bottom[0]->num(), channels_,
-        height_, width_, unpooled_height_, unpooled_width_, out_kernel_h_,
-        out_kernel_w_, out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_,
-        top_data);
+        count, bottom_data, mask, num_, channels_, height_, width_,
+        unpooled_height_, unpooled_width_, out_kernel_h_, out_kernel_w_,
+        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_, top_data);
     break;
   case UnPoolingParameter_UnPoolMethod_GROUP:
     // NOLINT_NEXT_LINE(whitespace/operators)
     CHECK_EQ(bottom.size(), 2);
     // use the reordered internal group data
     group_data = group_blob_.gpu_data();
-    for (int n = 0; n < bottom[1]->num(); ++n) {
+    for (int n = 0; n < num_; ++n) {
       const vector<map<int, vector<int> > >& group_maps = group_maps_vec_[n];
-      for (int gc = 0; gc < bottom[1]->channels(); ++gc) {
+      for (int gc = 0; gc < group_channels_; ++gc) {
         const map<int, vector<int> >& group_map = group_maps[gc];
         const int num_groups = group_map.size();
         // cuda function cannot call STL function, convert it to Blob data
@@ -232,13 +227,13 @@ void UnPoolingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         const int* group_map_range = group_map_range_.gpu_data();
         const int* group_map_index = group_map_index_.gpu_data();
         // prepare group_mean_
-        group_mean_.Reshape(1, bottom[0]->channels(), 1, num_groups);
+        group_mean_.Reshape(1, channels_, 1, num_groups);
         Dtype* group_mean_data = group_mean_.mutable_gpu_data();
         int group_count = group_mean_.count();
         // compute group_mean_data
         ComputeGroupMean<Dtype><<<CAFFE_GET_BLOCKS(group_count), CAFFE_CUDA_NUM_THREADS>>>(
             group_count, bottom_data, channels_, height_, width_, num_groups,
-            group_map_range, group_map_index, bottom[1]->channels(), group_mean_data);
+            group_map_range, group_map_index, group_channels_, group_mean_data);
         // spread group_mean_data to top_data
         GroupUnPoolForward<Dtype><<<CAFFE_GET_BLOCKS(bottom_count), CAFFE_CUDA_NUM_THREADS>>>(
             bottom_count, group_mean_data, channels_, height_, width_,
@@ -279,12 +274,10 @@ __global__ void FixedUnPoolBackward(const int nthreads, const Dtype* top_diff,
     uhmid = min(max(uhmid, 0), unpooled_height-1);
     uwmid = min(max(uwmid, 0), unpooled_width-1);
     int offset = (n * channels + c) * unpooled_height * unpooled_width;
-    top_diff += offset;
-    mask += offset;
     int unpool_index = uhmid * unpooled_width + uwmid;
     Dtype gradient = 0;
     if (mask[unpool_index] == h * width + w) {
-      gradient += top_diff[unpool_index];
+      gradient += top_diff[unpool_index + offset];
     }
     bottom_diff[index] = gradient;
   }
@@ -292,7 +285,7 @@ __global__ void FixedUnPoolBackward(const int nthreads, const Dtype* top_diff,
 
 template <typename Dtype>
 __global__ void DivUnPoolBackward(const int nthreads, const Dtype* top_diff,
-    const int num, const int channels, const int height,
+    const int* mask, const int num, const int channels, const int height,
     const int width, const int unpooled_height, const int unpooled_width,
     const int out_kernel_h, const int out_kernel_w, const int out_stride_h,
     const int out_stride_w, const int out_pad_h, const int out_pad_w,
@@ -314,10 +307,11 @@ __global__ void DivUnPoolBackward(const int nthreads, const Dtype* top_diff,
     uhend = min(uhend, unpooled_height);
     uwend = min(uwend, unpooled_width);
     Dtype gradient = 0;
-    top_diff += (n * channels + c) * unpooled_height * unpooled_width;
+    int offset = (n * channels + c) * unpooled_height * unpooled_width;
     for (int uh = uhstart; uh < uhend; ++uh) {
       for (int uw = uwstart; uw < uwend; ++uw) {
-        gradient += top_diff[uh * unpooled_width + uw];
+        int unpool_index = uh * unpooled_width + uw;
+        gradient += top_diff[unpool_index + offset] / mask[unpool_index];
       }
     }
     bottom_diff[index] = gradient / unpool_size;
@@ -326,7 +320,7 @@ __global__ void DivUnPoolBackward(const int nthreads, const Dtype* top_diff,
 
 template <typename Dtype>
 __global__ void RepUnPoolBackward(const int nthreads, const Dtype* top_diff,
-    const int num, const int channels, const int height,
+    const int* mask, const int num, const int channels, const int height,
     const int width, const int unpooled_height, const int unpooled_width,
     const int out_kernel_h, const int out_kernel_w, const int out_stride_h,
     const int out_stride_w, const int out_pad_h, const int out_pad_w,
@@ -347,10 +341,11 @@ __global__ void RepUnPoolBackward(const int nthreads, const Dtype* top_diff,
     uhend = min(uhend, unpooled_height);
     uwend = min(uwend, unpooled_width);
     Dtype gradient = 0;
-    top_diff += (n * channels + c) * unpooled_height * unpooled_width;
+    int offset = (n * channels + c) * unpooled_height * unpooled_width;
     for (int uh = uhstart; uh < uhend; ++uh) {
       for (int uw = uwstart; uw < uwend; ++uw) {
-        gradient += top_diff[uh * unpooled_width + uw];
+        int unpool_index = uh * unpooled_width + uw;
+        gradient += top_diff[unpool_index + offset] / mask[unpool_index];
       }
     }
     bottom_diff[index] = gradient;
@@ -382,41 +377,37 @@ void UnPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   const int count = bottom[0]->count();
   const int top_count = top[0]->count() / top[0]->num();
   caffe_gpu_set(count, Dtype(0.), bottom_diff);
-  const int* mask = NULL;
+  const int* mask = mask_.gpu_data();
   switch (this->layer_param_.unpooling_param().unpool()) {
   case UnPoolingParameter_UnPoolMethod_FIXED:
-    mask = fixed_idx_.gpu_data();
     // NOLINT_NEXT_LINE(whitespace/operators)
     FixedUnPoolBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, top_diff, mask, top[0]->num(), channels_, height_, width_,
+        count, top_diff, mask, num_, channels_, height_, width_,
         unpooled_height_, unpooled_width_, out_kernel_h_, out_kernel_w_,
-        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_,
-        bottom_diff);
+        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_, bottom_diff);
     break;
   case UnPoolingParameter_UnPoolMethod_DIV:
     // NOLINT_NEXT_LINE(whitespace/operators)
     DivUnPoolBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, top_diff, top[0]->num(), channels_,
-        height_, width_, unpooled_height_, unpooled_width_, out_kernel_h_,
-        out_kernel_w_, out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_,
-        bottom_diff);
+        count, top_diff, mask, num_, channels_, height_, width_,
+        unpooled_height_, unpooled_width_, out_kernel_h_, out_kernel_w_,
+        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_, bottom_diff);
     break;
   case UnPoolingParameter_UnPoolMethod_REP:
     // NOLINT_NEXT_LINE(whitespace/operators)
     RepUnPoolBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
-        count, top_diff, top[0]->num(), channels_,
-        height_, width_, unpooled_height_, unpooled_width_, out_kernel_h_,
-        out_kernel_w_, out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_,
-        bottom_diff);
+        count, top_diff, mask, num_, channels_, height_, width_,
+        unpooled_height_, unpooled_width_, out_kernel_h_, out_kernel_w_,
+        out_stride_h_, out_stride_w_, out_pad_h_, out_pad_w_, bottom_diff);
     break;
   case UnPoolingParameter_UnPoolMethod_GROUP:
     // NOLINT_NEXT_LINE(whitespace/operators)
     CHECK_EQ(bottom.size(), 2);
     // use the reordered internal group data
     group_data = group_blob_.gpu_data();
-    for (int n = 0; n < bottom[1]->num(); ++n) {
+    for (int n = 0; n < num_; ++n) {
       const vector<map<int, vector<int> > >& group_maps = group_maps_vec_[n];
-      for (int gc = 0; gc < bottom[1]->channels(); ++gc) {
+      for (int gc = 0; gc < group_channels_; ++gc) {
         const map<int, vector<int> >& group_map = group_maps[gc];
         const int num_groups = group_map.size();
         // cuda function cannot call STL function, convert it to Blob data
@@ -424,13 +415,13 @@ void UnPoolingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         const int* group_map_range = group_map_range_.gpu_data();
         const int* group_map_index = group_map_index_.gpu_data();
         // prepare group_mean_
-        group_mean_.Reshape(1, bottom[0]->channels(), 1, num_groups);
+        group_mean_.Reshape(1, channels_, 1, num_groups);
         Dtype* group_mean_diff = group_mean_.mutable_gpu_diff();
         int group_count = group_mean_.count();
         // compute group_mean_diff
         ComputeGroupMean<Dtype><<<CAFFE_GET_BLOCKS(group_count), CAFFE_CUDA_NUM_THREADS>>>(
             group_count, top_diff, channels_, height_, width_, num_groups,
-            group_map_range, group_map_index, bottom[1]->channels(), group_mean_diff);
+            group_map_range, group_map_index, group_channels_, group_mean_diff);
         // spread group_mean_diff to bottom_diff
         GroupUnPoolBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
             top_count, group_mean_diff, channels_, height_, width_, group_data,
