@@ -51,8 +51,8 @@ void ParseEvaluateLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     // count the number of ground truth labels, the predicted labels, and
     // predicted labels happens to be ground truth labels
     for (int j = 0; j < spatial_dim; ++j) {
-      int gt_label = bottom_gt[i];
-      int pred_label = bottom_pred[i];
+      int gt_label = bottom_gt[j];
+      int pred_label = bottom_pred[j];
       CHECK_LT(pred_label, num_labels_);
       if (ignore_labels_.find(gt_label) != ignore_labels_.end()) {
         continue;

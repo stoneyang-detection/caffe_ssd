@@ -143,24 +143,24 @@ TYPED_TEST(ParseEvaluateLayerTest, TestForwardCPU) {
   // Output:
   //     [ 2 6 3 ]
   //     [ 3 4 5 ]
-  //     [ 3 5 5 ]
-  //     [ 2 3 3 ]
+  //     [ 3 6 5 ]
+  //     [ 2 2 4 ]
   //     [ 0 0 1 ]
-  this->blob_top_->mutable_cpu_data()[0] = 2;
-  this->blob_top_->mutable_cpu_data()[1] = 6;
-  this->blob_top_->mutable_cpu_data()[2] = 3;
-  this->blob_top_->mutable_cpu_data()[3] = 3;
-  this->blob_top_->mutable_cpu_data()[4] = 4;
-  this->blob_top_->mutable_cpu_data()[5] = 5;
-  this->blob_top_->mutable_cpu_data()[6] = 3;
-  this->blob_top_->mutable_cpu_data()[7] = 5;
-  this->blob_top_->mutable_cpu_data()[8] = 5;
-  this->blob_top_->mutable_cpu_data()[9] = 2;
-  this->blob_top_->mutable_cpu_data()[10] = 3;
-  this->blob_top_->mutable_cpu_data()[11] = 3;
-  this->blob_top_->mutable_cpu_data()[12] = 0;
-  this->blob_top_->mutable_cpu_data()[13] = 0;
-  this->blob_top_->mutable_cpu_data()[14] = 1;
+  EXPECT_EQ(this->blob_top_->cpu_data()[0], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[1], 6);
+  EXPECT_EQ(this->blob_top_->cpu_data()[2], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[3], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[4], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[5], 5);
+  EXPECT_EQ(this->blob_top_->cpu_data()[6], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[7], 6);
+  EXPECT_EQ(this->blob_top_->cpu_data()[8], 5);
+  EXPECT_EQ(this->blob_top_->cpu_data()[9], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[10], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[11], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[12], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[13], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[14], 1);
 }
 
 TYPED_TEST(ParseEvaluateLayerTest, TestForwardIgnoreCPU) {
@@ -178,26 +178,26 @@ TYPED_TEST(ParseEvaluateLayerTest, TestForwardIgnoreCPU) {
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
 
   // Output:
-  //     [ 0 0 0 ]
-  //     [ 3 4 5 ]
-  //     [ 3 5 5 ]
-  //     [ 2 3 3 ]
   //     [ 0 0 1 ]
-  this->blob_top_->mutable_cpu_data()[0] = 0;
-  this->blob_top_->mutable_cpu_data()[1] = 0;
-  this->blob_top_->mutable_cpu_data()[2] = 0;
-  this->blob_top_->mutable_cpu_data()[3] = 3;
-  this->blob_top_->mutable_cpu_data()[4] = 4;
-  this->blob_top_->mutable_cpu_data()[5] = 5;
-  this->blob_top_->mutable_cpu_data()[6] = 3;
-  this->blob_top_->mutable_cpu_data()[7] = 5;
-  this->blob_top_->mutable_cpu_data()[8] = 5;
-  this->blob_top_->mutable_cpu_data()[9] = 2;
-  this->blob_top_->mutable_cpu_data()[10] = 3;
-  this->blob_top_->mutable_cpu_data()[11] = 3;
-  this->blob_top_->mutable_cpu_data()[12] = 0;
-  this->blob_top_->mutable_cpu_data()[13] = 0;
-  this->blob_top_->mutable_cpu_data()[14] = 1;
+  //     [ 3 4 4 ]
+  //     [ 3 6 3 ]
+  //     [ 2 2 4 ]
+  //     [ 0 0 0 ]
+  EXPECT_EQ(this->blob_top_->cpu_data()[0], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[1], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[2], 1);
+  EXPECT_EQ(this->blob_top_->cpu_data()[3], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[4], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[5], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[6], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[7], 6);
+  EXPECT_EQ(this->blob_top_->cpu_data()[8], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[9], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[10], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[11], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[12], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[13], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[14], 0);
 }
 
 TYPED_TEST(ParseEvaluateLayerTest, TestForwardIgnoreTwoCPU) {
@@ -216,26 +216,26 @@ TYPED_TEST(ParseEvaluateLayerTest, TestForwardIgnoreTwoCPU) {
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
 
   // Output:
+  //     [ 0 0 1 ]
+  //     [ 3 4 4 ]
+  //     [ 3 6 3 ]
+  //     [ 2 2 4 ]
   //     [ 0 0 0 ]
-  //     [ 3 4 5 ]
-  //     [ 3 5 5 ]
-  //     [ 2 3 3 ]
-  //     [ 0 0 0 ]
-  this->blob_top_->mutable_cpu_data()[0] = 0;
-  this->blob_top_->mutable_cpu_data()[1] = 0;
-  this->blob_top_->mutable_cpu_data()[2] = 0;
-  this->blob_top_->mutable_cpu_data()[3] = 3;
-  this->blob_top_->mutable_cpu_data()[4] = 4;
-  this->blob_top_->mutable_cpu_data()[5] = 5;
-  this->blob_top_->mutable_cpu_data()[6] = 3;
-  this->blob_top_->mutable_cpu_data()[7] = 5;
-  this->blob_top_->mutable_cpu_data()[8] = 5;
-  this->blob_top_->mutable_cpu_data()[9] = 2;
-  this->blob_top_->mutable_cpu_data()[10] = 3;
-  this->blob_top_->mutable_cpu_data()[11] = 3;
-  this->blob_top_->mutable_cpu_data()[12] = 0;
-  this->blob_top_->mutable_cpu_data()[13] = 0;
-  this->blob_top_->mutable_cpu_data()[14] = 0;
+  EXPECT_EQ(this->blob_top_->cpu_data()[0], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[1], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[2], 1);
+  EXPECT_EQ(this->blob_top_->cpu_data()[3], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[4], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[5], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[6], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[7], 6);
+  EXPECT_EQ(this->blob_top_->cpu_data()[8], 3);
+  EXPECT_EQ(this->blob_top_->cpu_data()[9], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[10], 2);
+  EXPECT_EQ(this->blob_top_->cpu_data()[11], 4);
+  EXPECT_EQ(this->blob_top_->cpu_data()[12], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[13], 0);
+  EXPECT_EQ(this->blob_top_->cpu_data()[14], 0);
 }
 
 }  // namespace caffe
