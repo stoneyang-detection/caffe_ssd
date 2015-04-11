@@ -31,6 +31,11 @@ class DiagonalAffineMap {
     return out;
   }
   inline vector<pair<Dtype, Dtype> > coefs() { return coefs_; }
+  void print_coefs() {
+    for (int i = 0; i < coefs_.size(); ++i) {
+      LOG(INFO) << coefs_[i].first << " " << coefs_[i].second;
+    }
+  }
 
  private:
   DiagonalAffineMap() { }
