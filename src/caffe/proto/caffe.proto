@@ -767,7 +767,6 @@ message UnPoolingParameter {
     FIXED = 0;  // Put in the middle of a kernel
     DIV = 1;    // Divide equally through a kernel
     REP = 2;    // Repeat through a kernel
-    GROUP = 3;  // Average over a region
   }
   optional UnPoolMethod unpool = 1 [default = FIXED]; // The unpooling method
   // Pad, kernel size, and stride are all given as a single value for equal

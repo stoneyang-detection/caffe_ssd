@@ -541,10 +541,47 @@ class UnPoolingLayer : public Layer<Dtype> {
   int out_kernel_h_, out_kernel_w_;
   int out_stride_h_, out_stride_w_;
   int out_pad_h_, out_pad_w_;
-  int num_, channels_, group_channels_;
+  int num_, channels_;
   int height_, width_;
   int unpooled_height_, unpooled_width_;
   Blob<int> mask_;
+};
+
+/**
+ * @brief Average the input image from the same region.
+ *
+ * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ */
+template <typename Dtype>
+class GroupingLayer : public Layer<Dtype> {
+ public:
+  explicit GroupingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "Grouping"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  int num_, channels_, group_channels_;
+  int height_, width_;
+
   Blob<Dtype> group_blob_;
   Blob<Dtype> group_mean_;
   vector<vector<map<int, vector<int> > > > group_maps_vec_;
