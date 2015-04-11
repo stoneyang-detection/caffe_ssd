@@ -59,6 +59,12 @@ void UnPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       out_stride_h_ = unpool_param.out_stride_h();
       out_stride_w_ = unpool_param.out_stride_w();
     }
+    if (!unpool_param.has_out_pad_h()) {
+      out_pad_h_ = out_pad_w_ = unpool_param.out_pad();
+    } else {
+      out_pad_h_ = unpool_param.out_pad_h();
+      out_pad_w_ = unpool_param.out_pad_w();
+    }
   } else {
     // Compute out_kernel and out_stride automatically
     out_kernel_h_ = static_cast<int>(ceil(static_cast<float>(
@@ -66,9 +72,9 @@ void UnPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     out_kernel_w_ = static_cast<int>(ceil(static_cast<float>(
                 bottom[1]->width()) / bottom[0]->width()));
 
-    out_stride_h_ = static_cast<int>(floor(static_cast<float>(
+    out_stride_h_ = static_cast<int>(ceil(static_cast<float>(
                 bottom[1]->height()) / bottom[0]->height()));
-    out_stride_w_ = static_cast<int>(floor(static_cast<float>(
+    out_stride_w_ = static_cast<int>(ceil(static_cast<float>(
                 bottom[1]->width()) / bottom[0]->width()));
 
     // In case either width or height of bottom[0] is 1, we set stride to 1
@@ -78,12 +84,13 @@ void UnPoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     if (out_stride_w_ == bottom[1]->width()) {
       out_stride_w_ = 1;
     }
-  }
-  if (!unpool_param.has_out_pad_h()) {
-    out_pad_h_ = out_pad_w_ = unpool_param.out_pad();
-  } else {
-    out_pad_h_ = unpool_param.out_pad_h();
-    out_pad_w_ = unpool_param.out_pad_w();
+
+    out_pad_h_ = static_cast<int>(floor(static_cast<float>(
+                (bottom[0]->height()-1)*out_stride_h_+out_kernel_h_
+                -bottom[1]->height())/2));
+    out_pad_w_ = static_cast<int>(floor(static_cast<float>(
+                (bottom[0]->width()-1)*out_stride_w_+out_kernel_w_
+                -bottom[1]->width())/2));
   }
   if (out_pad_h_ != 0 || out_pad_w_ != 0) {
     CHECK(this->layer_param_.unpooling_param().unpool()
@@ -158,25 +165,10 @@ void UnPoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     }
   } else {
     // deal with other cases
-    if (bottom.size() == 1) {
-      unpooled_height_ = (height_ - 1) * out_stride_h_ - 2 * out_pad_h_ +
-          out_kernel_h_;
-      unpooled_width_ = (width_ - 1) * out_stride_w_ - 2 * out_pad_w_ +
-          out_kernel_w_;
-    } else {
-      unpooled_height_ = bottom[1]->height();
-      unpooled_width_ = bottom[1]->width();
-      CHECK_GE((height_ - 1) * out_stride_h_ + out_kernel_h_, unpooled_height_);
-      CHECK_GE((width_ - 1) * out_stride_w_ + out_kernel_w_, unpooled_width_);
-      out_pad_h_ = static_cast<int>(floor(static_cast<float>(
-                  (height_-1)*out_stride_h_+out_kernel_h_-unpooled_height_)/2));
-      out_pad_w_ = static_cast<int>(floor(static_cast<float>(
-                  (width_-1)*out_stride_w_+out_kernel_w_-unpooled_width_)/2));
-    }
-    CHECK_EQ(height_, static_cast<int>(ceil(static_cast<float>(
-                    unpooled_height_ + 2 * out_pad_h_ - out_kernel_h_) / out_stride_h_)) + 1);
-    CHECK_EQ(width_, static_cast<int>(ceil(static_cast<float>(
-                    unpooled_width_ + 2 * out_pad_w_ - out_kernel_w_) / out_stride_w_)) + 1);
+    unpooled_height_ = (height_ - 1) * out_stride_h_ - 2 * out_pad_h_ +
+        out_kernel_h_;
+    unpooled_width_ = (width_ - 1) * out_stride_w_ - 2 * out_pad_w_ +
+        out_kernel_w_;
     top[0]->Reshape(num_, channels_, unpooled_height_, unpooled_width_);
   }
 
