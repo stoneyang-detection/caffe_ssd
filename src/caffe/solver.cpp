@@ -278,7 +278,6 @@ void Solver<Dtype>::Solve(const char* resume_file) {
   LOG(INFO) << "Optimization Done.";
 }
 
-
 template <typename Dtype>
 void Solver<Dtype>::TestAll() {
   for (int test_net_id = 0; test_net_id < test_nets_.size(); ++test_net_id) {
@@ -348,14 +347,13 @@ void Solver<Dtype>::Test(const int test_net_id) {
   }
 }
 
-
 template <typename Dtype>
 void Solver<Dtype>::TestSegmentation(const int test_net_id) {
   LOG(INFO) << "Iteration " << iter_
             << ", Testing net (#" << test_net_id << ")";
   CHECK_NOTNULL(test_nets_[test_net_id].get())->
       ShareTrainedLayersWith(net_.get());
-  Blob<Dtype> label_stats;
+  vector<shared_ptr<Blob<Dtype> > > label_stats;
   vector<Blob<Dtype>*> bottom_vec;
   const shared_ptr<Net<Dtype> >& test_net = test_nets_[test_net_id];
   Dtype loss = 0;
@@ -370,23 +368,20 @@ void Solver<Dtype>::TestSegmentation(const int test_net_id) {
       continue;
     }
     if (i == 0) {
-      label_stats.Reshape(result.size(), result[0]->channels(),
-                          result[0]->height(), result[0]->width());
       for (int j = 0; j < result.size(); ++j) {
-        // make sure output has same size
-        CHECK_EQ(result[j]->num(), 1);
-        CHECK_EQ(result[j]->channels(), label_stats.channels());
-        CHECK_EQ(result[j]->height(), label_stats.height());
-        CHECK_EQ(result[j]->width(), label_stats.width());
+        shared_ptr<Blob<Dtype> > label_stat(new Blob<Dtype>());
+        label_stats.push_back(label_stat);
+        label_stat->Reshape(1, result[j]->channels(),
+                            result[j]->height(), result[j]->width());
         // copy the result
         caffe_copy(result[j]->count(), result[j]->cpu_data(),
-                   label_stats.mutable_cpu_data() + label_stats.offset(j));
+                   label_stat->mutable_cpu_data());
       }
     } else {
       // add the result
       for (int j = 0; j < result.size(); ++j) {
         caffe_axpy(result[j]->count(), Dtype(1), result[j]->cpu_data(),
-                   label_stats.mutable_cpu_data() + label_stats.offset(j));
+                   label_stats[j]->mutable_cpu_data());
       }
     }
   }
@@ -394,49 +389,50 @@ void Solver<Dtype>::TestSegmentation(const int test_net_id) {
     loss /= param_.test_iter(test_net_id);
     LOG(INFO) << "Test loss: " << loss;
   }
-  for (int i = 0; i < label_stats.num(); ++i) {
-    const Dtype* label_stats_data = label_stats.cpu_data() + label_stats.offset(i);
+  for (int i = 0; i < label_stats.size(); ++i) {
+    const int output_blob_index = test_net->output_blob_indices()[i];
+    const string& output_name = test_net->blob_names()[output_blob_index];
+    const Dtype* label_stat_data = label_stats[i]->cpu_data();
+    const int channels = label_stats[i]->channels();
     // get sum infomation
     Dtype sum_gtpred = 0;
     Dtype sum_gt = 0;
-    for (int c = 0; c < label_stats.channels(); ++c) {
-      sum_gtpred += label_stats_data[c*3];
-      sum_gt += label_stats_data[c*3+1];
+    for (int c = 0; c < channels; ++c) {
+      sum_gtpred += label_stat_data[c*3];
+      sum_gt += label_stat_data[c*3+1];
     }
     if (sum_gt > 0) {
       // compute accuracy for segmentation
       Dtype per_pixel_acc = sum_gtpred / sum_gt;
       Dtype per_label_acc = 0;
       Dtype iou, iou_acc = 0, weighted_iou_acc = 0;
-      int num_valid_labels = 0, num_valid_ious = 0;
-      for (int c = 0; c < label_stats.channels(); ++c) {
-        if (label_stats_data[1] != 0) {
-          per_label_acc += label_stats_data[0] / label_stats_data[1];
-          ++num_valid_labels;
+      int num_valid_labels = 0;
+      for (int c = 0; c < channels; ++c) {
+        if (label_stat_data[1] == 0) {
+          continue;
         }
-        if (label_stats_data[1] + label_stats_data[2] != 0) {
-          iou = label_stats_data[0] / (label_stats_data[1] + label_stats_data[2] -
-                                       label_stats_data[0]);
-          iou_acc += iou;
-          weighted_iou_acc += iou * label_stats_data[1] / sum_gt;
-          ++num_valid_ious;
-        }
-        label_stats_data += label_stats.offset(0, 1);
+        per_label_acc += label_stat_data[0] / label_stat_data[1];
+        iou = label_stat_data[0] / (label_stat_data[1] + label_stat_data[2]
+                                    - label_stat_data[0]);
+        iou_acc += iou;
+        weighted_iou_acc += iou * label_stat_data[1] / sum_gt;
+        ++num_valid_labels;
+        label_stat_data += label_stats[i]->offset(0, 1);
       }
-      LOG(INFO) << "    Test net output #" << i << ": per_pixel_acc = "
-          << per_pixel_acc;
-      LOG(INFO) << "    Test net output #" << i << ": per_label_acc = "
-        << per_label_acc / num_valid_labels;
-      LOG(INFO) << "    Test net output #" << i << ": iou_acc = "
-          << iou_acc / num_valid_ious;
-      LOG(INFO) << "    Test net output #" << i << ": weighted_iou_acc = "
-          << weighted_iou_acc;
+      LOG(INFO) << "    Test net output #" << i << " " << output_name
+          << ": per_pixel_acc = " << per_pixel_acc;
+      LOG(INFO) << "    Test net output #" << i << " " << output_name
+          << ": per_label_acc = " << per_label_acc / num_valid_labels;
+      LOG(INFO) << "    Test net output #" << i << " " << output_name
+          << ": iou_acc = " << iou_acc / num_valid_labels;
+      LOG(INFO) << "    Test net output #" << i << " " << output_name
+          << ": weighted_iou_acc = " << weighted_iou_acc;
     } else {
-      LOG(INFO) << "    Test net: no valid labels!";
+      LOG(INFO) << "    Test net output #" << i << " " << output_name
+          << ": no valid labels!";
     }
   }
 }
-
 
 template <typename Dtype>
 void Solver<Dtype>::Snapshot() {
