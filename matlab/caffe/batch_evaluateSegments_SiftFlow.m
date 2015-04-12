@@ -6,8 +6,8 @@
 %   -- val.txt ==> contains the image names
 %   -- SemanticImages ==> contains the ground truth label
 %   -- Images ==> contains the original image
-root_dir = '/playpen1/data/PASCAL-Context';
-test_set = 'val';
+root_dir = '/playpen1/data/SiftFlow';
+test_set = 'TestSet1';
 fileList = sprintf('%s/%s.txt', root_dir, test_set);
 fid = fopen(fileList);
 C = textscan(fid, '%s');
@@ -15,8 +15,8 @@ names = C{1};
 clear C
 fclose(fid);
 
-num_cls = 60;
-ignore_label = [];
+num_cls = 33;
+ignore_label = [255];
 perLabelStats = zeros(num_cls, 3);
 
 nd = length(names);
@@ -28,7 +28,7 @@ for d = 1:nd
     end
     gt_file = sprintf('%s/SemanticImages/%s.png', root_dir, names{d});
     gt_img = imread(gt_file);
-    seg_file = sprintf('%s/results/Segmentation/comp5_%s_cls_2k/%s.png', root_dir, test_set, names{d});
+    seg_file = sprintf('%s/results/%s.png', root_dir, names{d});
     if ~exist(seg_file, 'file')
         seg = wl_segmentImage(img);
         imwrite(seg, seg_file);
@@ -38,7 +38,7 @@ for d = 1:nd
     perLabelStats = perLabelStats + perLabelStat;
 end
 
-% perLabelStats(all(perLabelStats==0, 2), :) = [];
+%perLabelStats(all(perLabelStats==0, 2), :) = [];
 perLabelStats(perLabelStats(:,2)==0, :) = [];
 fprintf('%.4f ', 100 * sum(perLabelStats(:,1)) / sum(perLabelStats(:,2)));
 fprintf('%.4f ', 100 * mean(perLabelStats(perLabelStats(:,2)~=0,1)./perLabelStats(perLabelStats(:,2)~=0,2)));
