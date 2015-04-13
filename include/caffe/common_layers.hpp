@@ -337,6 +337,7 @@ class NormalizeLayer : public Layer<Dtype> {
 
   Blob<Dtype> sum_multiplier_, norm_, squared_;
   bool across_spatial_;
+  Dtype scale_;
 };
 
 /**

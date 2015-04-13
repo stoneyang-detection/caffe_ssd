@@ -61,15 +61,45 @@ TYPED_TEST(NormalizeLayerTest, TestForward) {
     }
     const Dtype kErrorBound = 1e-5;
     // expect unit norm
-    EXPECT_NEAR(1, norm, kErrorBound);
+    EXPECT_NEAR(1, sqrt(norm), kErrorBound);
+  }
+}
+
+TYPED_TEST(NormalizeLayerTest, TestForwardScale) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_scale(10);
+  NormalizeLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  // Test norm
+  int num = this->blob_bottom_->num();
+  int channels = this->blob_bottom_->channels();
+  int height = this->blob_bottom_->height();
+  int width = this->blob_bottom_->width();
+
+  for (int i = 0; i < num; ++i) {
+    Dtype norm = 0;
+    for (int j = 0; j < channels; ++j) {
+      for (int k = 0; k < height; ++k) {
+        for (int l = 0; l < width; ++l) {
+          Dtype data = this->blob_top_->data_at(i, j, k, l);
+          norm += data * data;
+        }
+      }
+    }
+    const Dtype kErrorBound = 1e-5;
+    // expect unit norm
+    EXPECT_NEAR(10, sqrt(norm), kErrorBound);
   }
 }
 
 TYPED_TEST(NormalizeLayerTest, TestForwardEltWise) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
-  CHECK(google::protobuf::TextFormat::ParseFromString(
-          "norm_param{across_spatial: false}", &layer_param));
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_across_spatial(false);
   NormalizeLayer<Dtype> layer(layer_param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
@@ -89,7 +119,39 @@ TYPED_TEST(NormalizeLayerTest, TestForwardEltWise) {
         }
         const Dtype kErrorBound = 1e-5;
         // expect unit norm
-        EXPECT_NEAR(1, norm, kErrorBound);
+        EXPECT_NEAR(1, sqrt(norm), kErrorBound);
+      }
+
+    }
+  }
+}
+
+TYPED_TEST(NormalizeLayerTest, TestForwardEltWiseScale) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_across_spatial(false);
+  norm_param->set_scale(10);
+  NormalizeLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  // Test norm
+  int num = this->blob_bottom_->num();
+  int channels = this->blob_bottom_->channels();
+  int height = this->blob_bottom_->height();
+  int width = this->blob_bottom_->width();
+
+  for (int i = 0; i < num; ++i) {
+    for (int k = 0; k < height; ++k) {
+      for (int l = 0; l < width; ++l) {
+        Dtype norm = 0;
+        for (int j = 0; j < channels; ++j) {
+          Dtype data = this->blob_top_->data_at(i, j, k, l);
+          norm += data * data;
+        }
+        const Dtype kErrorBound = 1e-5;
+        // expect unit norm
+        EXPECT_NEAR(10, sqrt(norm), kErrorBound);
       }
 
     }
@@ -105,10 +167,34 @@ TYPED_TEST(NormalizeLayerTest, TestGradient) {
       this->blob_top_vec_);
 }
 
+TYPED_TEST(NormalizeLayerTest, TestGradientScale) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_scale(3);
+  NormalizeLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
 TYPED_TEST(NormalizeLayerTest, TestGradientEltWise) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
-  CHECK(google::protobuf::TextFormat::ParseFromString("norm_param{across_spatial: false}", &layer_param));
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_across_spatial(false);
+  NormalizeLayer<Dtype> layer(layer_param);
+  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
+      this->blob_top_vec_);
+}
+
+TYPED_TEST(NormalizeLayerTest, TestGradientEltWiseScale) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_across_spatial(false);
+  norm_param->set_scale(10);
   NormalizeLayer<Dtype> layer(layer_param);
   GradientChecker<Dtype> checker(1e-2, 1e-3);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,

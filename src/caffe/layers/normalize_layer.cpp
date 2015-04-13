@@ -20,6 +20,8 @@ void NormalizeLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   } else {
     norm_.Reshape(bottom[0]->num(), 1, bottom[0]->height(), bottom[0]->width());
   }
+  scale_ = this->layer_param_.norm_param().scale();
+  CHECK_GT(scale_, Dtype(0));
 }
 
 template <typename Dtype>
@@ -39,7 +41,7 @@ void NormalizeLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     caffe_sqr<Dtype>(dim, bottom_data, squared_data);
     if (across_spatial_) {
       norm_data[n] = pow(caffe_cpu_asum<Dtype>(dim, squared_data), Dtype(0.5)) + eps;
-      caffe_cpu_scale<Dtype>(dim, Dtype(1)/norm_data[n], bottom_data, top_data);
+      caffe_cpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_data, top_data);
     } else {
       for (int c = 0; c < channels; ++c) {
         caffe_add<Dtype>(spatial_dim, squared_data+c*spatial_dim, norm_data,
@@ -51,6 +53,9 @@ void NormalizeLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       for (int c = 0; c < channels; ++c) {
         caffe_div<Dtype>(spatial_dim, bottom_data+c*spatial_dim, norm_data,
                          top_data+c*spatial_dim);
+      }
+      if (scale_ != 1) {
+        caffe_cpu_scale<Dtype>(dim, scale_, top_data, top_data);
       }
       norm_data += spatial_dim;
     }
@@ -74,10 +79,10 @@ void NormalizeLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   for (int n = 0; n < num; ++n) {
     if (across_spatial_) {
       Dtype a = caffe_cpu_dot<Dtype>(dim, top_data, top_diff);
-      caffe_cpu_scale<Dtype>(dim, a, top_data, bottom_diff);
+      caffe_cpu_scale<Dtype>(dim, a / scale_ / scale_, top_data, bottom_diff);
       caffe_sub<Dtype>(dim, top_diff, bottom_diff, bottom_diff);
       CHECK_GT(norm_data[n], 0) << "norm should larger than 0";
-      caffe_cpu_scale<Dtype>(dim, Dtype(1)/norm_data[n], bottom_diff,
+      caffe_cpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_diff,
                              bottom_diff);
     } else {
       // use squared_data to store temp result
@@ -92,11 +97,17 @@ void NormalizeLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
         caffe_mul<Dtype>(spatial_dim, top_data+c*spatial_dim, squared_data,
                          bottom_diff+c*spatial_dim);
       }
+      if (scale_ != 1) {
+        caffe_cpu_scale<Dtype>(dim, 1 / scale_ / scale_, bottom_diff, bottom_diff);
+      }
       caffe_sub<Dtype>(dim, top_diff, bottom_diff, bottom_diff);
       // divide by norm
       for (int c = 0; c < channels; ++c) {
         caffe_div<Dtype>(spatial_dim, bottom_diff+c*spatial_dim, norm_data,
                          bottom_diff+c*spatial_dim);
+      }
+      if (scale_ != 1) {
+        caffe_cpu_scale<Dtype>(dim, scale_, bottom_diff, bottom_diff);
       }
       norm_data += spatial_dim;
     }

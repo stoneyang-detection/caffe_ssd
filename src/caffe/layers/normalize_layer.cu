@@ -36,7 +36,7 @@ void NormalizeLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       Dtype normsqr;
       caffe_gpu_asum<Dtype>(dim, squared_data, &normsqr);
       norm_data[n] = pow(normsqr, Dtype(0.5)) + eps;
-      caffe_gpu_scale<Dtype>(dim, Dtype(1)/norm_data[n], bottom_data, top_data);
+      caffe_gpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_data, top_data);
     } else {
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_add<Dtype>(spatial_dim, squared_data+c*spatial_dim, norm_data,
@@ -48,6 +48,9 @@ void NormalizeLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_div<Dtype>(spatial_dim, bottom_data+c*spatial_dim, norm_data,
             top_data+c*spatial_dim);
+      }
+      if (scale_ != 1) {
+        caffe_gpu_scale<Dtype>(dim, scale_, top_data, top_data);
       }
       norm_data += spatial_dim;
     }
@@ -79,9 +82,9 @@ void NormalizeLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     if (across_spatial_) {
       Dtype a;
       caffe_gpu_dot<Dtype>(dim, top_data, top_diff, &a);
-      caffe_gpu_scale<Dtype>(dim, a, top_data, bottom_diff);
+      caffe_gpu_scale<Dtype>(dim, a / scale_ / scale_, top_data, bottom_diff);
       caffe_gpu_sub<Dtype>(dim, top_diff, bottom_diff, bottom_diff);
-      caffe_gpu_scale<Dtype>(dim, Dtype(1)/norm_data[n], bottom_diff, bottom_diff);
+      caffe_gpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_diff, bottom_diff);
     } else {
       // use squared_data to store temp result
       // dot product between top_data and top_diff
@@ -95,11 +98,17 @@ void NormalizeLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         caffe_gpu_mul<Dtype>(spatial_dim, top_data+c*spatial_dim, squared_data,
             bottom_diff+c*spatial_dim);
       }
+      if (scale_ != 1) {
+        caffe_gpu_scale<Dtype>(dim, 1 / scale_ / scale_, bottom_diff, bottom_diff);
+      }
       caffe_gpu_sub<Dtype>(dim, top_diff, bottom_diff, bottom_diff);
       // divide by norm
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_div<Dtype>(spatial_dim, bottom_diff+c*spatial_dim, norm_data,
             bottom_diff+c*spatial_dim);
+      }
+      if (scale_ != 1) {
+        caffe_gpu_scale<Dtype>(dim, scale_, bottom_diff, bottom_diff);
       }
       norm_data += spatial_dim;
     }

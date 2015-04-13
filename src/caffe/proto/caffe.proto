@@ -639,6 +639,8 @@ message MVNParameter {
 // Message that stores parameters used by NormalizeLayer
 message NormalizeParameter {
   optional bool across_spatial = 1 [default = true];
+  // scale to norm
+  optional float scale = 2 [default = 1.0];
 }
 
 // Message that stores parameters used by ParseEvaluateLayer
