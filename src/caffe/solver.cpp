@@ -408,15 +408,17 @@ void Solver<Dtype>::TestSegmentation(const int test_net_id) {
       Dtype iou, iou_acc = 0, weighted_iou_acc = 0;
       int num_valid_labels = 0;
       for (int c = 0; c < channels; ++c) {
-        if (label_stat_data[1] == 0) {
-          continue;
+        // LOG(INFO) << label_stat_data[0] << " " << label_stat_data[1] << "  " << label_stat_data[2];
+        if (label_stat_data[1] != 0) {
+          per_label_acc += label_stat_data[0] / label_stat_data[1];
+          ++num_valid_labels;
         }
-        per_label_acc += label_stat_data[0] / label_stat_data[1];
-        iou = label_stat_data[0] / (label_stat_data[1] + label_stat_data[2]
-                                    - label_stat_data[0]);
-        iou_acc += iou;
-        weighted_iou_acc += iou * label_stat_data[1] / sum_gt;
-        ++num_valid_labels;
+        if (label_stat_data[1] + label_stat_data[2] != 0) {
+          iou = label_stat_data[0] / (label_stat_data[1] + label_stat_data[2]
+                                      - label_stat_data[0]);
+          iou_acc += iou;
+          weighted_iou_acc += iou * label_stat_data[1] / sum_gt;
+        }
         label_stat_data += label_stats[i]->offset(0, 1);
       }
       LOG(INFO) << "    Test net output #" << i << " " << output_name
