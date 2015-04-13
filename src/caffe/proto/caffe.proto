@@ -852,6 +852,8 @@ message V1LayerParameter {
     MEMORY_DATA = 29;
     MULTINOMIAL_LOGISTIC_LOSS = 16;
     MVN = 34;
+    PARSE_OUTPUT = 41;
+    PARSE_EVALUATE = 42;
     POOLING = 17;
     POWER = 26;
     RELU = 18;
