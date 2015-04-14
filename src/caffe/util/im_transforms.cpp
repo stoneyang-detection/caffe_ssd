@@ -208,7 +208,7 @@ namespace caffe {
     const int new_height = param.height();
     const int new_width = param.width();
 
-    int pad_mode;
+    int pad_mode = cv::BORDER_CONSTANT;
     switch (param.pad_mode()) {
       case ResizeParameter_Pad_mode_CONSTANT:
       {
@@ -225,9 +225,14 @@ namespace caffe {
         pad_mode = cv::BORDER_REPLICATE;
         break;
       }
+      default:
+      {
+        LOG(FATAL) << "Unknown pad_mode: " << param.pad_mode();
+        break;
+      }
     }
 
-    int interp_mode;
+    int interp_mode = cv::INTER_LINEAR;
     switch (param.interp_mode()) {
       case ResizeParameter_Interp_mode_AREA:
       {
@@ -252,6 +257,11 @@ namespace caffe {
       case ResizeParameter_Interp_mode_LANCZOS4:
       {
         interp_mode = cv::INTER_LANCZOS4;
+        break;
+      }
+      default:
+      {
+        LOG(FATAL) << "Unknown interp_mode: " << param.interp_mode();
         break;
       }
     }
