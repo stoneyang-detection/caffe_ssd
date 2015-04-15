@@ -505,8 +505,15 @@ message ArgMaxParameter {
 
 // Message that stores parameters used by BNLayer
 message BNParameter {
-  optional FillerParameter scale_filler = 1; // The filler for the scale
-  optional FillerParameter shift_filler = 2; // The filler for the shift
+  optional FillerParameter scale_filler = 1;
+  optional FillerParameter shift_filler = 2;
+
+  optional float var_eps = 3 [default = 1e-10];
+  optional bool moving_average = 4 [default = false];
+  optional float decay = 5 [default = 0.95];
+
+  // If true, compute mean & variance across spatial and samples
+  optional bool across_spatial = 6 [default = true];
 }
 
 // Message that stores parameters used by ConcatLayer
