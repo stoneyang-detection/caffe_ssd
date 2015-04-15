@@ -1,7 +1,7 @@
 #include <opencv2/core/core.hpp>
 
 #include <stdint.h>
-
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -23,8 +23,9 @@ DataLayer<Dtype>::~DataLayer<Dtype>() {
 
 template <typename Dtype>
 void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top) {
+                                      const vector<Blob<Dtype>*>& top) {
   // Initialize DB
+  this->shuffle_on_init = false;
   db_.reset(db::GetDB(this->layer_param_.data_param().backend()));
   db_->Open(this->layer_param_.data_param().source(), db::READ);
   cursor_.reset(db_->NewCursor());
@@ -32,7 +33,7 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   // Check if we should randomly skip a few data points
   if (this->layer_param_.data_param().rand_skip()) {
     unsigned int skip = caffe_rng_rand() %
-                        this->layer_param_.data_param().rand_skip();
+        this->layer_param_.data_param().rand_skip();
     LOG(INFO) << "Skipping first " << skip << " data points.";
     while (skip-- > 0) {
       cursor_->Next();
@@ -51,18 +52,29 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
   int crop_size = this->layer_param_.transform_param().crop_size();
   if (crop_size > 0) {
     top[0]->Reshape(this->layer_param_.data_param().batch_size(),
-        datum.channels(), crop_size, crop_size);
+                    datum.channels(), crop_size, crop_size);
+    if ( 0 < this->layer_param_.data_param().shuffle_buffer_size() ) {
+      this->shuffle_buffer_data_.Reshape(
+          this->layer_param_.data_param().shuffle_buffer_size()
+          * this->layer_param_.data_param().batch_size(),
+          datum.channels(), crop_size, crop_size);
+    }
     this->prefetch_data_.Reshape(this->layer_param_.data_param().batch_size(),
-        datum.channels(), crop_size, crop_size);
+                                 datum.channels(), crop_size, crop_size);
     this->transformed_data_.Reshape(1, datum.channels(), crop_size, crop_size);
   } else {
     top[0]->Reshape(
         this->layer_param_.data_param().batch_size(), datum.channels(),
         datum.height(), datum.width());
     this->prefetch_data_.Reshape(this->layer_param_.data_param().batch_size(),
-        datum.channels(), datum.height(), datum.width());
+                                 datum.channels(), datum.height(), datum.width());
     this->transformed_data_.Reshape(1, datum.channels(),
-      datum.height(), datum.width());
+                                    datum.height(), datum.width());
+    if ( 0 < this->layer_param_.data_param().shuffle_buffer_size() ) {
+      this->shuffle_buffer_data_.Reshape(
+          this->layer_param_.data_param().shuffle_buffer_size(),
+          datum.channels(), datum.height(), datum.width());
+    }
   }
   LOG(INFO) << "output data size: " << top[0]->num() << ","
       << top[0]->channels() << "," << top[0]->height() << ","
@@ -72,6 +84,11 @@ void DataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
     vector<int> label_shape(1, this->layer_param_.data_param().batch_size());
     top[1]->Reshape(label_shape);
     this->prefetch_label_.Reshape(label_shape);
+    if ( 0 < this->layer_param_.data_param().shuffle_buffer_size() ) {
+      this->shuffle_buffer_label_.Reshape(
+          this->layer_param_.data_param().shuffle_buffer_size() *
+          this->layer_param_.data_param().batch_size(), 1, 1, 1);
+    }
   }
 }
 
@@ -101,9 +118,9 @@ void DataLayer<Dtype>::InternalThreadEntry() {
       }
     }
     this->prefetch_data_.Reshape(1, datum.channels(),
-        datum.height(), datum.width());
+                                 datum.height(), datum.width());
     this->transformed_data_.Reshape(1, datum.channels(),
-        datum.height(), datum.width());
+                                    datum.height(), datum.width());
   }
 
   Dtype* top_data = this->prefetch_data_.mutable_cpu_data();
@@ -112,52 +129,146 @@ void DataLayer<Dtype>::InternalThreadEntry() {
   if (this->output_labels_) {
     top_label = this->prefetch_label_.mutable_cpu_data();
   }
-  for (int item_id = 0; item_id < batch_size; ++item_id) {
-    timer.Start();
-    // get a blob
-    Datum datum;
-    datum.ParseFromString(cursor_->value());
+  int read_cycles = 1;
+  if ( !(this->shuffle_on_init) &&
+      (0 < this->layer_param_.data_param().shuffle_buffer_size())) {
+    read_cycles = 1+this->layer_param_.data_param().shuffle_buffer_size();
+  }
+  for ( int cycle = 0; cycle < read_cycles ; ++cycle ) {
+    for ( int item_id = 0; item_id < batch_size; ++item_id ) {
+      timer.Start();
+      // get a blob
+      Datum datum;
+      datum.ParseFromString(cursor_->value());
 
-    cv::Mat cv_img;
-    if (datum.encoded()) {
-      if (force_color) {
-        cv_img = DecodeDatumToCVMat(datum, true);
-      } else {
-        cv_img = DecodeDatumToCVMatNative(datum);
+      cv::Mat cv_img;
+      if (datum.encoded()) {
+        if (force_color) {
+          cv_img = DecodeDatumToCVMat(datum, true);
+        } else {
+          cv_img = DecodeDatumToCVMatNative(datum);
+        }
+        if ( (read_cycles != (cycle - 1) )
+            && (0 < this->layer_param_.data_param().shuffle_buffer_size())) {
+          Dtype * shuffle_buffer_data =
+              this->shuffle_buffer_data_.mutable_cpu_data()
+              + this->shuffle_buffer_data_.offset(cycle *
+                                                  this->prefetch_data_.num());
+          Dtype * prefetch_data = this->prefetch_data_.mutable_cpu_data();
+
+          int dtype_count = this->prefetch_data_.count();
+
+          std::swap_ranges(shuffle_buffer_data, shuffle_buffer_data +
+                           dtype_count, prefetch_data);
+
+          if (this->output_labels_) {
+            Dtype *shuffle_buffer_label =
+                this->shuffle_buffer_label_.mutable_cpu_data()
+                + this->shuffle_buffer_label_.offset(
+                    cycle * this->prefetch_label_.num());
+            Dtype *prefetch_label =
+                this->prefetch_label_.mutable_cpu_data();
+
+            int num = this->prefetch_data_.num();
+
+            std::swap_ranges(shuffle_buffer_label,
+                             shuffle_buffer_label + num, prefetch_label);
+          }
+
+
+          if (cv_img.channels() != this->transformed_data_.channels()) {
+            LOG(WARNING) << "Your dataset contains encoded images with mixed "
+                << "channel sizes. Consider adding a 'force_color' flag to the "
+                << "model definition, or rebuild your dataset using "
+                << "convert_imageset.";
+          }
+        }
+        read_time += timer.MicroSeconds();
+        timer.Start();
+
+        // Apply data transformations (mirror, scale, crop...)
+        int offset = this->prefetch_data_.offset(item_id);
+        this->transformed_data_.set_cpu_data(top_data + offset);
+        if (datum.encoded()) {
+          this->data_transformer_->Transform(cv_img,
+                                             &(this->transformed_data_));
+        } else {
+          this->data_transformer_->Transform(datum,
+                                             &(this->transformed_data_));
+        }
+        if (this->output_labels_) {
+          top_label[item_id] = datum.label();
+        }
+        trans_time += timer.MicroSeconds();
+        // go to the next iter
+        cursor_->Next();
+        if (!cursor_->valid()) {
+          DLOG(INFO) << "Restarting data prefetching from start.";
+          cursor_->SeekToFirst();
+        }
       }
       if (cv_img.channels() != this->transformed_data_.channels()) {
         LOG(WARNING) << "Your dataset contains encoded images with mixed "
-        << "channel sizes. Consider adding a 'force_color' flag to the "
-        << "model definition, or rebuild your dataset using "
-        << "convert_imageset.";
+            << "channel sizes. Consider adding a 'force_color' flag to the "
+            << "model definition, or rebuild your dataset using "
+            << "convert_imageset.";
+      }
+
+      read_time += timer.MicroSeconds();
+      timer.Start();
+
+      // Apply data transformations (mirror, scale, crop...)
+      int offset = this->prefetch_data_.offset(item_id);
+      this->transformed_data_.set_cpu_data(top_data + offset);
+      if (datum.encoded()) {
+        this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
+      } else {
+        this->data_transformer_->Transform(datum, &(this->transformed_data_));
+      }
+      if (this->output_labels_) {
+        top_label[item_id] = datum.label();
+      }
+      trans_time += timer.MicroSeconds();
+      // go to the next iter
+      cursor_->Next();
+      if (!cursor_->valid()) {
+        DLOG(INFO) << "Restarting data prefetching from start.";
+        cursor_->SeekToFirst();
       }
     }
-    read_time += timer.MicroSeconds();
-    timer.Start();
+    if (0 < this->layer_param_.data_param().shuffle_buffer_size()) {
+      CPUTimer swap_timer;
+      swap_timer.Start();
+      boost::uniform_int<int> shuffle_range(0,
+                                            this->shuffle_buffer_data_.num() - 1);
+      for (int item_id = 0; item_id < batch_size; ++item_id) {
+        int swap_with = shuffle_range(*caffe_rng());
 
-    // Apply data transformations (mirror, scale, crop...)
-    int offset = this->prefetch_data_.offset(item_id);
-    this->transformed_data_.set_cpu_data(top_data + offset);
-    if (datum.encoded()) {
-      this->data_transformer_->Transform(cv_img, &(this->transformed_data_));
-    } else {
-      this->data_transformer_->Transform(datum, &(this->transformed_data_));
+        Dtype * shuffle_buffer_data =
+            this->shuffle_buffer_data_.mutable_cpu_data()
+            + this->shuffle_buffer_data_.offset(swap_with);
+
+        Dtype * prefetch_data = this->prefetch_data_.mutable_cpu_data()
+            + this->prefetch_data_.offset(item_id);
+
+        int dtype_count = this->prefetch_data_.count()
+            / this->prefetch_data_.num();
+        std::swap_ranges(shuffle_buffer_data, shuffle_buffer_data +
+                         dtype_count, prefetch_data);
+
+        if (this->output_labels_) {
+          std::swap(this->shuffle_buffer_label_.mutable_cpu_data()[swap_with],
+                    this->prefetch_label_.mutable_cpu_data()[item_id]);
+        }
+      }
+      LOG(INFO) << swap_timer.MicroSeconds()/1000.0 << "ms for shuffle";
     }
-    if (this->output_labels_) {
-      top_label[item_id] = datum.label();
-    }
-    trans_time += timer.MicroSeconds();
-    // go to the next iter
-    cursor_->Next();
-    if (!cursor_->valid()) {
-      DLOG(INFO) << "Restarting data prefetching from start.";
-      cursor_->SeekToFirst();
-    }
+    this->shuffle_on_init = true;
+    batch_timer.Stop();
+    DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
+    DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
+    DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
   }
-  batch_timer.Stop();
-  DLOG(INFO) << "Prefetch batch: " << batch_timer.MilliSeconds() << " ms.";
-  DLOG(INFO) << "     Read time: " << read_time / 1000 << " ms.";
-  DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
 }
 
 INSTANTIATE_CLASS(DataLayer);
