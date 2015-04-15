@@ -207,13 +207,6 @@ void DataLayer<Dtype>::InternalThreadEntry() {
           cursor_->SeekToFirst();
         }
       }
-      if (cv_img.channels() != this->transformed_data_.channels()) {
-        LOG(WARNING) << "Your dataset contains encoded images with mixed "
-            << "channel sizes. Consider adding a 'force_color' flag to the "
-            << "model definition, or rebuild your dataset using "
-            << "convert_imageset.";
-      }
-
       read_time += timer.MicroSeconds();
       timer.Start();
 
