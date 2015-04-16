@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Create the classification lmdb inputs
+# Create the classification $DB_TYPE inputs
 # N.B. set the path to the dataset train + val data dirs
 
 if [ $# -gt 7 ] || [ $# -lt 3 ]
@@ -32,7 +32,8 @@ then
   gray=$7
 fi
 
-EXAMPLE=$ROOTDIR/$name/lmdb
+DB_TYPE=datumfile
+EXAMPLE=$ROOTDIR/$name/$DB_TYPE
 DATA=data/$name
 TOOLS=build/tools
 
@@ -62,11 +63,11 @@ if [ ! -d "$DATA_ROOT" ]; then
   exit 1
 fi
 
-echo "Creating $name $dataset lmdb..."
+echo "Creating $name $dataset $DB_TYPE..."
 
-if [ -d $EXAMPLE/"$name"_"$dataset"_lmdb ]
+if [ -d $EXAMPLE/"$name"_"$dataset"_$DB_TYPE ]
 then
-  rm -r $EXAMPLE/"$name"_"$dataset"_lmdb
+  rm -r $EXAMPLE/"$name"_"$dataset"_$DB_TYPE
 fi
 
 GLOG_logtostderr=1 $TOOLS/convert_imageset \
@@ -75,15 +76,16 @@ GLOG_logtostderr=1 $TOOLS/convert_imageset \
     --shuffle=$shuffle \
     --check_size=$check_size \
     --gray=$gray \
+    --backend=$DB_TYPE \
     $DATA_ROOT \
     $DATA/$dataset.txt \
-    $EXAMPLE/"$name"_"$dataset"_lmdb
+    $EXAMPLE/"$name"_"$dataset"_$DB_TYPE
 
 if [ ! -d examples/$name ]
 then
   mkdir examples/$name
 fi
-rm -f examples/$name/"$name"_"$dataset"_lmdb
-ln -s $EXAMPLE/"$name"_"$dataset"_lmdb examples/$name/
+rm -f examples/$name/"$name"_"$dataset"_$DB_TYPE
+ln -s $EXAMPLE/"$name"_"$dataset"_$DB_TYPE examples/$name/
 
 echo "Done."
