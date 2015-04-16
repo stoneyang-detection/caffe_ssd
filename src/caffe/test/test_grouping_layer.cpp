@@ -20,8 +20,7 @@ class GroupingLayerTest : public MultiDeviceTest<TypeParam> {
  protected:
   GroupingLayerTest()
       : blob_bottom_(new Blob<Dtype>()),
-      blob_top_(new Blob<Dtype>()),
-      blob_top_mask_(new Blob<Dtype>()) {}
+      blob_top_(new Blob<Dtype>()) {}
   virtual void SetUp() {
     Caffe::set_random_seed(1029);
     blob_bottom_->Reshape(2, 3, 3, 2);
@@ -35,11 +34,9 @@ class GroupingLayerTest : public MultiDeviceTest<TypeParam> {
   virtual ~GroupingLayerTest() {
     delete blob_bottom_;
     delete blob_top_;
-    delete blob_top_mask_;
   }
   Blob<Dtype>* const blob_bottom_;
   Blob<Dtype>* const blob_top_;
-  Blob<Dtype>* const blob_top_mask_;
   vector<Blob<Dtype>*> blob_bottom_vec_;
   vector<Blob<Dtype>*> blob_top_vec_;
 };
@@ -220,7 +217,6 @@ TYPED_TEST(GroupingLayerTest, TestForwardGroupMult) {
 
 TYPED_TEST(GroupingLayerTest, TestGradientGroup) {
   typedef typename TypeParam::Dtype Dtype;
-  LayerParameter layer_param;
   Blob<Dtype>* group_blob(new Blob<Dtype>());
   int num = 2;
   group_blob->Reshape(num, 3, 3, 2);
@@ -228,7 +224,7 @@ TYPED_TEST(GroupingLayerTest, TestGradientGroup) {
   //     [ 1 2 ]
   //     [ 1 2 ]
   //     [ 4 4 ]
-  //     =========
+ //     =========
   //     [ 8 8 ]
   //     [ 8 8 ]
   //     [ 8 8 ]
@@ -257,10 +253,11 @@ TYPED_TEST(GroupingLayerTest, TestGradientGroup) {
     group_blob->mutable_cpu_data()[i+17] = 2;
   }
   this->blob_bottom_vec_.push_back(group_blob);
+  LayerParameter layer_param;
   GroupingLayer<Dtype> layer(layer_param);
   GradientChecker<Dtype> checker(1e-4, 1e-2);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
-                                  this->blob_top_vec_);
+                                  this->blob_top_vec_, 0);
   this->blob_bottom_vec_.pop_back();
 }
 
