@@ -28,7 +28,10 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* const_accum_variance = accum_variance_.gpu_data();
 
   const Dtype* batch_sum_multiplier_data = batch_sum_multiplier_.gpu_data();
-  const Dtype* spatial_sum_multiplier_data = spatial_sum_multiplier_.gpu_data();
+  const Dtype* spatial_sum_multiplier_data = NULL;
+  if (across_spatial_) {
+    spatial_sum_multiplier_data = spatial_sum_multiplier_.gpu_data();
+  }
   Dtype* x_norm_data = x_norm_.mutable_gpu_data();
 
   const Dtype* scale_data = this->blobs_[0]->gpu_data();
@@ -51,7 +54,7 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       caffe_gpu_gemv<Dtype>(CblasTrans, N_, C_*H_*W_, Dtype(1./N_), bottom_data,
           batch_sum_multiplier_data, Dtype(0), buffer_cube);
       // average spatially
-      caffe_gpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./H_*W_),
+      caffe_gpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./(H_*W_)),
           const_buffer_cube, spatial_sum_multiplier_data,
           Dtype(0), mean_data);
     } else {
@@ -68,7 +71,7 @@ void BNLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       caffe_gpu_gemv<Dtype>(CblasTrans, N_, C_*H_*W_, Dtype(1./N_), const_buffer_data,
           batch_sum_multiplier_data, Dtype(0), buffer_cube);
       // average spatially
-      caffe_gpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./H_*W_), const_buffer_cube,
+      caffe_gpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./(H_*W_)), const_buffer_cube,
           spatial_sum_multiplier_data, Dtype(0), std_data);
     } else {
       // average across batch
@@ -191,7 +194,10 @@ void BNLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   const Dtype* scale_data = this->blobs_[0]->gpu_data();
 
   const Dtype* batch_sum_multiplier_data = batch_sum_multiplier_.gpu_data();
-  const Dtype* spatial_sum_multiplier_data = spatial_sum_multiplier_.gpu_data();
+  const Dtype* spatial_sum_multiplier_data = NULL;
+  if (across_spatial_) {
+    spatial_sum_multiplier_data = spatial_sum_multiplier_.gpu_data();
+  }
 
   Dtype* buffer_data = buffer_blob_.mutable_gpu_data();
   const Dtype* const_buffer_data = buffer_blob_.gpu_data();

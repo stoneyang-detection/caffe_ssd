@@ -150,7 +150,10 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* const_accum_variance = accum_variance_.cpu_data();
 
   const Dtype* batch_sum_multiplier_data = batch_sum_multiplier_.cpu_data();
-  const Dtype* spatial_sum_multiplier_data = spatial_sum_multiplier_.cpu_data();
+  const Dtype* spatial_sum_multiplier_data = NULL;
+  if (across_spatial_) {
+    spatial_sum_multiplier_data = spatial_sum_multiplier_.cpu_data();
+  }
   Dtype* x_norm_data = x_norm_.mutable_cpu_data();
 
   const Dtype* scale_data = this->blobs_[0]->cpu_data();
@@ -173,7 +176,7 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       caffe_cpu_gemv<Dtype>(CblasTrans, N_, C_*H_*W_, Dtype(1./N_), bottom_data,
                             batch_sum_multiplier_data, Dtype(0), buffer_cube);
       // average spatially
-      caffe_cpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./H_*W_),
+      caffe_cpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./(H_*W_)),
                             const_buffer_cube, spatial_sum_multiplier_data,
                             Dtype(0), mean_data);
     } else {
@@ -190,7 +193,7 @@ void BNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       caffe_cpu_gemv<Dtype>(CblasTrans, N_, C_*H_*W_, Dtype(1./N_), const_buffer_data,
                             batch_sum_multiplier_data, Dtype(0), buffer_cube);
       // average spatially
-      caffe_cpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./H_*W_), const_buffer_cube,
+      caffe_cpu_gemv<Dtype>(CblasNoTrans, C_, H_*W_, Dtype(1./(H_*W_)), const_buffer_cube,
                             spatial_sum_multiplier_data, Dtype(0), std_data);
     } else {
       // average across batch
@@ -313,7 +316,10 @@ void BNLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   const Dtype* scale_data = this->blobs_[0]->cpu_data();
 
   const Dtype* batch_sum_multiplier_data = batch_sum_multiplier_.cpu_data();
-  const Dtype* spatial_sum_multiplier_data = spatial_sum_multiplier_.cpu_data();
+  const Dtype* spatial_sum_multiplier_data = NULL;
+  if (across_spatial_) {
+    spatial_sum_multiplier_data = spatial_sum_multiplier_.cpu_data();
+  }
 
   Dtype* buffer_data = buffer_blob_.mutable_cpu_data();
   const Dtype* const_buffer_data = buffer_blob_.cpu_data();
