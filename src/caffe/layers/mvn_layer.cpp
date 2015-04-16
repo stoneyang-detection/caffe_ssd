@@ -18,8 +18,13 @@ void MVNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       1, 1);
   temp_.Reshape(bottom[0]->num(), bottom[0]->channels(),
       bottom[0]->height(), bottom[0]->width());
-  sum_multiplier_.Reshape(1, 1,
-      bottom[0]->height(), bottom[0]->width());
+  if (this->layer_param_.mvn_param().across_channels()) {
+    sum_multiplier_.Reshape(1, bottom[0]->channels(),
+        bottom[0]->height(), bottom[0]->width());
+  } else {
+    sum_multiplier_.Reshape(1, 1,
+        bottom[0]->height(), bottom[0]->width());
+  }
   Dtype* multiplier_data = sum_multiplier_.mutable_cpu_data();
   caffe_set(sum_multiplier_.count(), Dtype(1), multiplier_data);
   eps = this->layer_param_.mvn_param().eps();
@@ -31,10 +36,11 @@ void MVNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
   int num;
-  if (this->layer_param_.mvn_param().across_channels())
+  if (this->layer_param_.mvn_param().across_channels()) {
     num = bottom[0]->num();
-  else
+  } else {
     num = bottom[0]->num() * bottom[0]->channels();
+  }
 
   int dim = bottom[0]->count() / num;
 
@@ -63,10 +69,10 @@ void MVNLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     caffe_add(temp_.count(), bottom_data, temp_.cpu_data(), top_data);
 
     // normalize variance
+    caffe_add_scalar(variance_.count(), eps, variance_.mutable_cpu_data());
+
     caffe_powx(variance_.count(), variance_.cpu_data(), Dtype(0.5),
           variance_.mutable_cpu_data());
-
-    caffe_add_scalar(variance_.count(), eps, variance_.mutable_cpu_data());
 
     caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num, dim, 1, 1.,
           variance_.cpu_data(), sum_multiplier_.cpu_data(), 0.,
@@ -96,10 +102,11 @@ void MVNLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
 
   int num;
-  if (this->layer_param_.mvn_param().across_channels())
+  if (this->layer_param_.mvn_param().across_channels()) {
     num = bottom[0]->num();
-  else
+  } else {
     num = bottom[0]->num() * bottom[0]->channels();
+  }
 
   int dim = bottom[0]->count() / num;
 
@@ -131,7 +138,12 @@ void MVNLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 
     caffe_div(temp_.count(), bottom_diff, temp_.cpu_data(), bottom_diff);
   } else {
-    caffe_copy(temp_.count(), top_diff, bottom_diff);
+    caffe_cpu_gemv<Dtype>(CblasNoTrans, num, dim, 1. / dim, top_diff,
+        sum_multiplier_.cpu_data(), 0., mean_.mutable_cpu_data());  // EX
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num, dim, 1, -1.,
+        mean_.cpu_data(), sum_multiplier_.cpu_data(), 0.,
+        temp_.mutable_cpu_data());
+    caffe_add(temp_.count(), top_diff, temp_.cpu_data(), bottom_diff);
   }
 }
 
