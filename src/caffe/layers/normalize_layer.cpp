@@ -22,6 +22,7 @@ void NormalizeLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   }
   scale_ = this->layer_param_.norm_param().scale();
   CHECK_GT(scale_, Dtype(0));
+  eps = this->layer_param_.norm_param().eps();
 }
 
 template <typename Dtype>
@@ -36,20 +37,20 @@ void NormalizeLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   int dim = bottom[0]->count() / num;
   int spatial_dim = bottom[0]->height() * bottom[0]->width();
   int channels = bottom[0]->channels();
-  Dtype eps = 1e-10;
   for (int n = 0; n < num; ++n) {
     caffe_sqr<Dtype>(dim, bottom_data, squared_data);
     if (across_spatial_) {
-      norm_data[n] = pow(caffe_cpu_asum<Dtype>(dim, squared_data), Dtype(0.5)) + eps;
+      // add eps to avoid overflow
+      norm_data[n] = pow(caffe_cpu_asum<Dtype>(dim, squared_data)+eps, Dtype(0.5));
       caffe_cpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_data, top_data);
     } else {
       for (int c = 0; c < channels; ++c) {
         caffe_add<Dtype>(spatial_dim, squared_data+c*spatial_dim, norm_data,
                          norm_data);
       }
-      caffe_powx<Dtype>(spatial_dim, norm_data, Dtype(0.5), norm_data);
       // add eps to avoid overflow
       caffe_add_scalar<Dtype>(spatial_dim, eps, norm_data);
+      caffe_powx<Dtype>(spatial_dim, norm_data, Dtype(0.5), norm_data);
       for (int c = 0; c < channels; ++c) {
         caffe_div<Dtype>(spatial_dim, bottom_data+c*spatial_dim, norm_data,
                          top_data+c*spatial_dim);
@@ -81,7 +82,6 @@ void NormalizeLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       Dtype a = caffe_cpu_dot<Dtype>(dim, top_data, top_diff);
       caffe_cpu_scale<Dtype>(dim, a / scale_ / scale_, top_data, bottom_diff);
       caffe_sub<Dtype>(dim, top_diff, bottom_diff, bottom_diff);
-      CHECK_GT(norm_data[n], 0) << "norm should larger than 0";
       caffe_cpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_diff,
                              bottom_diff);
     } else {

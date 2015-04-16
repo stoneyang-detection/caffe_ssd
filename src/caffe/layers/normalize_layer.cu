@@ -28,23 +28,22 @@ void NormalizeLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   int dim = bottom[0]->count() / num;
   int spatial_dim = bottom[0]->height() * bottom[0]->width();
   int channels = bottom[0]->channels();
-  // add eps to avoid overflow
-  Dtype eps = 1e-10;
   for (int n = 0; n < num; ++n) {
     caffe_gpu_powx<Dtype>(dim, bottom_data, Dtype(2), squared_data);
     if (across_spatial_) {
       Dtype normsqr;
       caffe_gpu_asum<Dtype>(dim, squared_data, &normsqr);
-      norm_data[n] = pow(normsqr, Dtype(0.5)) + eps;
+      // add eps to avoid overflow
+      norm_data[n] = pow(normsqr+eps, Dtype(0.5));
       caffe_gpu_scale<Dtype>(dim, scale_ / norm_data[n], bottom_data, top_data);
     } else {
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_add<Dtype>(spatial_dim, squared_data+c*spatial_dim, norm_data,
             norm_data);
       }
-      caffe_gpu_powx<Dtype>(spatial_dim, norm_data, Dtype(0.5), norm_data);
       // add eps to avoid overflow
       caffe_gpu_add_scalar<Dtype>(spatial_dim, eps, norm_data);
+      caffe_gpu_powx<Dtype>(spatial_dim, norm_data, Dtype(0.5), norm_data);
       for (int c = 0; c < channels; ++c) {
         caffe_gpu_div<Dtype>(spatial_dim, bottom_data+c*spatial_dim, norm_data,
             top_data+c*spatial_dim);

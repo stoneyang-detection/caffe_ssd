@@ -758,7 +758,7 @@ message MVNParameter {
   optional bool across_channels = 2 [default = false];
 
   // Epsilon for not dividing by zero while normalizing variance
-  optional float eps = 3 [default = 1e-9];
+  optional float eps = 3 [default = 1e-10];
 }
 
 // Message that stores parameters used by NormalizeLayer
@@ -766,6 +766,8 @@ message NormalizeParameter {
   optional bool across_spatial = 1 [default = true];
   // scale to norm
   optional float scale = 2 [default = 1.0];
+  // Epsilon for not dividing by zero while normalizing variance
+  optional float eps = 3 [default = 1e-10];
 }
 
 // Message that stores parameters used by ParseEvaluateLayer

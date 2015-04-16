@@ -19,7 +19,7 @@ class NormalizeLayerTest : public MultiDeviceTest<TypeParam> {
   typedef typename TypeParam::Dtype Dtype;
  protected:
   NormalizeLayerTest()
-      : blob_bottom_(new Blob<Dtype>(2, 3, 4, 5)),
+      : blob_bottom_(new Blob<Dtype>(2, 8, 4, 5)),
         blob_top_(new Blob<Dtype>()) {
     // fill the values
     FillerParameter filler_param;
@@ -184,7 +184,7 @@ TYPED_TEST(NormalizeLayerTest, TestGradientEltWise) {
   NormalizeParameter* norm_param = layer_param.mutable_norm_param();
   norm_param->set_across_spatial(false);
   NormalizeLayer<Dtype> layer(layer_param);
-  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  GradientChecker<Dtype> checker(1e-3, 1e-3);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
       this->blob_top_vec_);
 }
@@ -196,7 +196,7 @@ TYPED_TEST(NormalizeLayerTest, TestGradientEltWiseScale) {
   norm_param->set_across_spatial(false);
   norm_param->set_scale(10);
   NormalizeLayer<Dtype> layer(layer_param);
-  GradientChecker<Dtype> checker(1e-2, 1e-3);
+  GradientChecker<Dtype> checker(1e-3, 2e-3);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
       this->blob_top_vec_);
 }
