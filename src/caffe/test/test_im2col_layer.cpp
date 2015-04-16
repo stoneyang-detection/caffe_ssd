@@ -62,7 +62,7 @@ TYPED_TEST(Im2colLayerTest, TestSetupHole) {
   Im2colLayer<Dtype> layer(layer_param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   EXPECT_EQ(this->blob_top_->num(), 2);
-  EXPECT_EQ(this->blob_top_->channels(), 27);
+  EXPECT_EQ(this->blob_top_->channels(), 12);
   EXPECT_EQ(this->blob_top_->height(), 2);
   EXPECT_EQ(this->blob_top_->width(), 2);
 }

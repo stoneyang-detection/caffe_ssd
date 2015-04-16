@@ -42,7 +42,7 @@ class Im2colKernelTest : public ::testing::Test {
     channels_ = blob_bottom_->channels();
     pad_ = 0;
     stride_ = 2;
-    filter_stride_ = 4;
+    filter_stride_ = 2;
     kernel_size_ = 3;
     const int kernel_size_eff = kernel_size_
       + (kernel_size_ - 1) * (filter_stride_ - 1);
