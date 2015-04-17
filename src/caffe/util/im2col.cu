@@ -89,7 +89,6 @@ __global__ void col2im_gpu_kernel(const int n, const Dtype* data_col,
     int patch_h_eff = patch_h + (patch_h - 1) * (filter_stride_h - 1);
     int h_col_start = (h < patch_h_eff) ? 0 : (h - patch_h_eff) / stride_h + 1;
     int h_col_end = min(h / stride_h + 1, height_col);
-    int c_col = c * patch_h * patch_w;
     for (int h_col = h_col_start; h_col < h_col_end; ++h_col) {
       if ((h - h_col * stride_h) % filter_stride_h == 0) {
         for (int w_col = w_col_start; w_col < w_col_end; ++w_col) {
