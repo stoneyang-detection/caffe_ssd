@@ -91,12 +91,16 @@ __global__ void col2im_gpu_kernel(const int n, const Dtype* data_col,
     int h_col_end = min(h / stride_h + 1, height_col);
     int c_col = c * patch_h * patch_w;
     for (int h_col = h_col_start; h_col < h_col_end; ++h_col) {
-      for (int w_col = w_col_start; w_col < w_col_end; ++w_col) {
-        // the col location: [c * width * height + h_out, w_out]
-        int c_col = c * patch_h * patch_w
-          + (h - h_col * stride_h) / filter_stride_h * patch_w
-          + (w - w_col * stride_w) / filter_stride_w;
-        val += data_col[(c_col * height_col + h_col) * width_col + w_col];
+      if ((h - h_col * stride_h) % filter_stride_h == 0) {
+        for (int w_col = w_col_start; w_col < w_col_end; ++w_col) {
+          if ((w - w_col * stride_h) % filter_stride_w == 0) {
+            // the col location: [c * width * height + h_out, w_out]
+            int c_col = c * patch_h * patch_w
+              + (h - h_col * stride_h) / filter_stride_h * patch_w
+              + (w - w_col * stride_w) / filter_stride_w;
+            val += data_col[(c_col * height_col + h_col) * width_col + w_col];
+          }
+        }
       }
     }
     data_im[index] = val;
