@@ -62,6 +62,8 @@ void BaseConvolutionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     filter_stride_h_ = conv_param.filter_stride_h();
     filter_stride_w_ = conv_param.filter_stride_w();
   }
+  kernel_w_eff_ = kernel_w_ + (kernel_w_ - 1) * (filter_stride_w_ - 1);
+  kernel_h_eff_ = kernel_h_ + (kernel_h_ - 1) * (filter_stride_h_ - 1);
   // Special case: im2col is the identity for 1x1 convolution with stride 1
   // and filter_stride 1 and no padding, so flag for skipping the buffer and
   // transformation.
