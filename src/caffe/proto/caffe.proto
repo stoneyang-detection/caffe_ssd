@@ -764,10 +764,12 @@ message MVNParameter {
 // Message that stores parameters used by NormalizeLayer
 message NormalizeParameter {
   optional bool across_spatial = 1 [default = true];
-  // scale to norm
-  optional float scale = 2 [default = 1.0];
+  // Initial value of scale. Default is 1.0 for all
+  optional FillerParameter scale_filler = 2;
+  // Whether or not scale parameters are shared across channels.
+  optional bool channel_shared = 3 [default = false];
   // Epsilon for not dividing by zero while normalizing variance
-  optional float eps = 3 [default = 1e-10];
+  optional float eps = 4 [default = 1e-10];
 }
 
 // Message that stores parameters used by ParseEvaluateLayer

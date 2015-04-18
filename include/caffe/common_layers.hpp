@@ -412,6 +412,8 @@ class NormalizeLayer : public Layer<Dtype> {
  public:
   explicit NormalizeLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
@@ -434,8 +436,8 @@ class NormalizeLayer : public Layer<Dtype> {
 
   Blob<Dtype> sum_multiplier_, norm_, squared_;
   bool across_spatial_;
-  Dtype scale_;
-  Dtype eps;
+  bool channel_shared_;
+  Dtype eps_;
 };
 
 /**

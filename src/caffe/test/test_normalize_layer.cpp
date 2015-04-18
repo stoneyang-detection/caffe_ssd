@@ -23,7 +23,9 @@ class NormalizeLayerTest : public MultiDeviceTest<TypeParam> {
         blob_top_(new Blob<Dtype>()) {
     // fill the values
     FillerParameter filler_param;
-    GaussianFiller<Dtype> filler(filler_param);
+    // GaussianFiller<Dtype> filler(filler_param);
+    filler_param.set_value(1);
+    ConstantFiller<Dtype> filler(filler_param);
     filler.Fill(this->blob_bottom_);
     blob_bottom_vec_.push_back(blob_bottom_);
     blob_top_vec_.push_back(blob_top_);
@@ -69,7 +71,40 @@ TYPED_TEST(NormalizeLayerTest, TestForwardScale) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   NormalizeParameter* norm_param = layer_param.mutable_norm_param();
-  norm_param->set_scale(10);
+  norm_param->mutable_scale_filler()->set_type("constant");
+  norm_param->mutable_scale_filler()->set_value(10);
+  NormalizeLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  // Test norm
+  int num = this->blob_bottom_->num();
+  int channels = this->blob_bottom_->channels();
+  int height = this->blob_bottom_->height();
+  int width = this->blob_bottom_->width();
+
+  for (int i = 0; i < num; ++i) {
+    Dtype norm = 0;
+    for (int j = 0; j < channels; ++j) {
+      for (int k = 0; k < height; ++k) {
+        for (int l = 0; l < width; ++l) {
+          Dtype data = this->blob_top_->data_at(i, j, k, l);
+          norm += data * data;
+        }
+      }
+    }
+    const Dtype kErrorBound = 1e-5;
+    // expect unit norm
+    EXPECT_NEAR(10, sqrt(norm), kErrorBound);
+  }
+}
+
+TYPED_TEST(NormalizeLayerTest, TestForwardScaleShared) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_channel_shared(true);
+  norm_param->mutable_scale_filler()->set_type("constant");
+  norm_param->mutable_scale_filler()->set_value(10);
   NormalizeLayer<Dtype> layer(layer_param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
@@ -131,7 +166,42 @@ TYPED_TEST(NormalizeLayerTest, TestForwardEltWiseScale) {
   LayerParameter layer_param;
   NormalizeParameter* norm_param = layer_param.mutable_norm_param();
   norm_param->set_across_spatial(false);
-  norm_param->set_scale(10);
+  norm_param->mutable_scale_filler()->set_type("constant");
+  norm_param->mutable_scale_filler()->set_value(10);
+  NormalizeLayer<Dtype> layer(layer_param);
+  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
+  // Test norm
+  int num = this->blob_bottom_->num();
+  int channels = this->blob_bottom_->channels();
+  int height = this->blob_bottom_->height();
+  int width = this->blob_bottom_->width();
+
+  for (int i = 0; i < num; ++i) {
+    for (int k = 0; k < height; ++k) {
+      for (int l = 0; l < width; ++l) {
+        Dtype norm = 0;
+        for (int j = 0; j < channels; ++j) {
+          Dtype data = this->blob_top_->data_at(i, j, k, l);
+          norm += data * data;
+        }
+        const Dtype kErrorBound = 1e-5;
+        // expect unit norm
+        EXPECT_NEAR(10, sqrt(norm), kErrorBound);
+      }
+
+    }
+  }
+}
+
+TYPED_TEST(NormalizeLayerTest, TestForwardEltWiseScaleShared) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  NormalizeParameter* norm_param = layer_param.mutable_norm_param();
+  norm_param->set_across_spatial(false);
+  norm_param->set_channel_shared(true);
+  norm_param->mutable_scale_filler()->set_type("constant");
+  norm_param->mutable_scale_filler()->set_value(10);
   NormalizeLayer<Dtype> layer(layer_param);
   layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
   layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
@@ -171,7 +241,8 @@ TYPED_TEST(NormalizeLayerTest, TestGradientScale) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
   NormalizeParameter* norm_param = layer_param.mutable_norm_param();
-  norm_param->set_scale(3);
+  norm_param->mutable_scale_filler()->set_type("constant");
+  norm_param->mutable_scale_filler()->set_value(3);
   NormalizeLayer<Dtype> layer(layer_param);
   GradientChecker<Dtype> checker(1e-2, 1e-3);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
@@ -194,7 +265,8 @@ TYPED_TEST(NormalizeLayerTest, TestGradientEltWiseScale) {
   LayerParameter layer_param;
   NormalizeParameter* norm_param = layer_param.mutable_norm_param();
   norm_param->set_across_spatial(false);
-  norm_param->set_scale(10);
+  norm_param->mutable_scale_filler()->set_type("constant");
+  norm_param->mutable_scale_filler()->set_value(3);
   NormalizeLayer<Dtype> layer(layer_param);
   GradientChecker<Dtype> checker(1e-3, 2e-3);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
