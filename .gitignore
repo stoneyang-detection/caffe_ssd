@@ -100,3 +100,6 @@ jobs/*
 # Example files
 examples
 examples/*
+
+# Matlab scripts
+matlab/caffe/batch*
