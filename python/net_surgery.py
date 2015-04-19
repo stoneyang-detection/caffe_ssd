@@ -9,18 +9,13 @@ sys.path.insert(0, caffe_root + 'python')
 
 import caffe
 
-def sample_filter(param, in_dim, out_dim, in_stride, out_stride):
-  if len(param) != in_dim * out_dim:
-    print "param should have same dimension as in_dim * out_dim"
-    return []
-  out_param = [param[(i-1)*in_dim:i*in_dim] for i in range(1, out_dim, out_stride)]
-  out_param = [item for sublist in out_param for item in sublist]
-  out_param = out_param[0::in_stride]
-  return out_param
+def sample_filter(param, n_stride, c_stride, h_stride, w_stride):
+  out_param = param[0::n_stride, 0::c_stride, 0::h_stride, 0::w_stride]
+  return out_param.flat
 
 # Load the original network and extract the fully connected layers' parameters.
-net = caffe.Net('../models/VGGNet/VGG_ILSVRC_16_layers_deploy.prototxt',
-    '../models/VGGNet/VGG_ILSVRC_16_layers.caffemodel', caffe.TEST)
+net = caffe.Net('../models/VGGNet/VGG_ILSVRC_16_layers_fc_deploy.prototxt',
+    '../models/VGGNet/VGG_ILSVRC_16_layers_fc.caffemodel', caffe.TEST)
 params = net.params.keys()
 fc_params = {pr: (net.params[pr][0].data, net.params[pr][1].data) for pr in params}
 
@@ -39,19 +34,13 @@ for conv in params_full_conv:
 
 for pr, pr_conv in zip(params, params_full_conv):
   if 'fc6' == pr:
-    fc_shape = fc_params[pr][0].shape
-    conv_params[pr_conv][0].flat = sample_filter(fc_params[pr][0].flat, fc_shape[1], fc_shape[0], 3, 4)
-    fc_shape = fc_params[pr][1].shape
+    conv_params[pr_conv][0].flat = sample_filter(fc_params[pr][0], 4, 1, 3, 3)
     conv_params[pr_conv][1][...] = fc_params[pr][1][0::4]
   elif 'fc7' == pr:
-    fc_shape = fc_params[pr][0].shape
-    conv_params[pr_conv][0].flat = sample_filter(fc_params[pr][0].flat, fc_shape[1], fc_shape[0], 4, 4)
-    fc_shape = fc_params[pr][1].shape
+    conv_params[pr_conv][0].flat = sample_filter(fc_params[pr][0], 4, 4, 1, 1)
     conv_params[pr_conv][1][...] = fc_params[pr][1][0::4]
   elif 'fc8' == pr:
-    fc_shape = fc_params[pr][0].shape
-    conv_params[pr_conv][0].flat = sample_filter(fc_params[pr][0].flat, fc_shape[1], fc_shape[0], 4, 4)
-    fc_shape = fc_params[pr][1].shape
+    conv_params[pr_conv][0].flat = sample_filter(fc_params[pr][0], 1, 4, 1, 1)
     conv_params[pr_conv][1][...] = fc_params[pr][1]
   else:
     conv_params[pr_conv][0].flat = fc_params[pr][0].flat  # flat unrolls the arrays
