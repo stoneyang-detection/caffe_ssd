@@ -414,6 +414,25 @@ TYPED_TEST(PoolingLayerTest, TestSetupGlobalPooling) {
   EXPECT_EQ(this->blob_top_->width(), 1);
 }
 
+TYPED_TEST(PoolingLayerTest, TestSetupBinPooling) {
+  typedef typename TypeParam::Dtype Dtype;
+  LayerParameter layer_param;
+  PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
+  pooling_param->set_pool(PoolingParameter_PoolMethod_AVE);
+  for (int bin_h = 1; bin_h <= this->blob_bottom_->height(); ++bin_h) {
+    pooling_param->set_bin_h(bin_h);
+    for (int bin_w = 1; bin_w <= this->blob_bottom_->width(); ++bin_w) {
+      pooling_param->set_bin_w(bin_w);
+      PoolingLayer<Dtype> layer(layer_param);
+      layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
+      EXPECT_EQ(this->blob_top_->num(), this->blob_bottom_->num());
+      EXPECT_EQ(this->blob_top_->channels(), this->blob_bottom_->channels());
+      EXPECT_EQ(this->blob_top_->height(), bin_h);
+      EXPECT_EQ(this->blob_top_->width(), bin_w);
+    }
+  }
+}
+
 /*
 TYPED_TEST(PoolingLayerTest, PrintBackward) {
   LayerParameter layer_param;

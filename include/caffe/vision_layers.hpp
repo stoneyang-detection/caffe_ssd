@@ -433,6 +433,7 @@ class PoolingLayer : public Layer<Dtype> {
   int kernel_h_, kernel_w_;
   int stride_h_, stride_w_;
   int pad_h_, pad_w_;
+  int bin_h_, bin_w_;
   int channels_;
   int height_, width_;
   int pooled_height_, pooled_width_;
