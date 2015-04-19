@@ -39,12 +39,8 @@ void PoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     // dynamically decide kernel, stride, and pad
     kernel_h_ = static_cast<int>(ceil(static_cast<float>(height_) / bin_h_));
     kernel_w_ = static_cast<int>(ceil(static_cast<float>(width_) / bin_w_));
-    stride_h_ = static_cast<int>(ceil(static_cast<float>(height_ - kernel_h_)
-                                       / (bin_h_ - 1)));
-    stride_h_ = kernel_h_ == height_ ? 1 : stride_h_;
-    stride_w_ = static_cast<int>(ceil(static_cast<float>(width_ - kernel_w_)
-                                       / (bin_w_ - 1)));
-    stride_w_ = kernel_w_ == width_ ? 1 : stride_w_;
+    stride_h_ = kernel_h_ == height_ ? 1 : kernel_h_;
+    stride_w_ = kernel_w_ == width_ ? 1 : kernel_w_;
     pad_h_ = static_cast<int>(floor(static_cast<float>(bin_h_ - 1) * stride_h_
                                     + kernel_h_ - height_) / 2);
     pad_w_ = static_cast<int>(floor(static_cast<float>(bin_w_ - 1) * stride_w_
@@ -129,12 +125,8 @@ void PoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
     // dynamically decide kernel, stride, and pad
     kernel_h_ = static_cast<int>(ceil(static_cast<float>(height_) / bin_h_));
     kernel_w_ = static_cast<int>(ceil(static_cast<float>(width_) / bin_w_));
-    stride_h_ = static_cast<int>(ceil(static_cast<float>(height_ - kernel_h_)
-                                       / (bin_h_ - 1)));
-    stride_h_ = kernel_h_ == height_ ? 1 : stride_h_;
-    stride_w_ = static_cast<int>(ceil(static_cast<float>(width_ - kernel_w_)
-                                       / (bin_w_ - 1)));
-    stride_w_ = kernel_w_ == width_ ? 1 : stride_w_;
+    stride_h_ = kernel_h_ == height_ ? 1 : kernel_h_;
+    stride_w_ = kernel_w_ == width_ ? 1 : kernel_w_;
     pad_h_ = static_cast<int>(floor(static_cast<float>(bin_h_ - 1) * stride_h_
                                     + kernel_h_ - height_) / 2);
     pad_w_ = static_cast<int>(floor(static_cast<float>(bin_w_ - 1) * stride_w_
