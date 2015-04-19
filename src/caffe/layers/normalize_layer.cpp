@@ -54,7 +54,11 @@ void NormalizeLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   }
 
   // Propagate gradients to the parameters (as directed by backward pass).
-  this->param_propagate_down_.resize(this->blobs_.size(), true);
+  if (norm_param.fix_scale()) {
+    this->param_propagate_down_.resize(this->blobs_.size(), false);
+  } else {
+    this->param_propagate_down_.resize(this->blobs_.size(), true);
+  }
 }
 
 template <typename Dtype>
