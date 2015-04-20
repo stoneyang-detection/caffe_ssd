@@ -434,7 +434,9 @@ class NormalizeLayer : public Layer<Dtype> {
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  Blob<Dtype> sum_multiplier_, norm_, squared_;
+  Blob<Dtype> norm_;
+  Blob<Dtype> sum_channel_multiplier_, sum_spatial_multiplier_;
+  Blob<Dtype> buffer_, buffer_channel_, buffer_spatial_;
   bool across_spatial_;
   bool channel_shared_;
   Dtype eps_;
