@@ -2,37 +2,41 @@
 # Create the classification $DB_TYPE inputs
 # N.B. set the path to the dataset train + val data dirs
 
-if [ $# -gt 7 ] || [ $# -lt 3 ]
+if [ $# -gt 8 ] || [ $# -lt 3 ]
 then
-  echo "Usage: $0 ROOTDIR name dataset [shuffle=1] [resize=0] [check_size=1] [gray=0]"
+  echo "Usage: $0 ROOTDIR name dataset [DB=lmdb] [shuffle=0] [resize=0] [check_size=1] [gray=0]"
   exit
 fi
 
 ROOTDIR=$1
 name=$2
 dataset=$3
-shuffle=1
+DB_TYPE=lmdb
 if [ $# -ge 4 ]
 then
-  shuffle=$4
+  DB_TYPE=$4
 fi
-resize=0
+shuffle=0
 if [ $# -ge 5 ]
 then
-  resize=$5
+  shuffle=$5
 fi
-check_size=1
+resize=0
 if [ $# -ge 6 ]
 then
-  check_size=$6
+  resize=$6
 fi
-gray=0
+check_size=1
 if [ $# -ge 7 ]
 then
-  gray=$7
+  check_size=$7
+fi
+gray=0
+if [ $# -ge 8 ]
+then
+  gray=$8
 fi
 
-DB_TYPE=datumfile
 EXAMPLE=$ROOTDIR/$name/$DB_TYPE
 DATA=data/$name
 TOOLS=build/tools
