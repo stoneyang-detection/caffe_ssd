@@ -157,9 +157,8 @@ void NormalizeLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   // Propagate to param
   if (this->param_propagate_down_[0]) {
     Dtype* scale_diff = this->blobs_[0]->mutable_cpu_diff();
-    caffe_set(this->blobs_[0]->count(), Dtype(0), scale_diff);
     if (channel_shared_) {
-      scale_diff[0] = caffe_cpu_dot<Dtype>(count, top_data, top_diff) / scale[0];
+      scale_diff[0] += caffe_cpu_dot<Dtype>(count, top_data, top_diff) / scale[0];
     } else {
       for (int n = 0; n < num; ++n) {
         caffe_mul<Dtype>(dim, top_data+n*dim, top_diff+n*dim, buffer_data);

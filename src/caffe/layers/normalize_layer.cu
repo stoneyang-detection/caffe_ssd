@@ -136,7 +136,7 @@ void NormalizeLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       Dtype* scale_diff = this->blobs_[0]->mutable_cpu_diff();
       Dtype a;
       caffe_gpu_dot<Dtype>(count, top_data, top_diff, &a);
-      scale_diff[0] = a / scale[0];
+      scale_diff[0] += a / scale[0];
     } else {
       Dtype* scale_diff = this->blobs_[0]->mutable_gpu_diff();
       for (int n = 0; n < num; ++n) {
