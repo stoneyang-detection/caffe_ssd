@@ -34,8 +34,8 @@ void PoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     width_ = bottom[0]->width();
     CHECK_GT(bin_h_, 0) << "Bin # in height direction cannot be zero.";
     CHECK_GT(bin_w_, 0) << "Bin # in width direction cannot be zero.";
-    CHECK_LE(bin_h_, height_) << "Bin # in height direction cannot be larger than height.";
-    CHECK_LE(bin_w_, width_) << "Bin # in width direction cannot be larger than width.";
+    CHECK_LE(bin_h_, height_ / 2) << "Bin # in height direction cannot be larger than half of height.";
+    CHECK_LE(bin_w_, width_ / 2) << "Bin # in width direction cannot be larger than half of width.";
     // dynamically decide kernel, stride, and pad
     kernel_h_ = static_cast<int>(ceil(static_cast<float>(height_) / bin_h_));
     kernel_w_ = static_cast<int>(ceil(static_cast<float>(width_) / bin_w_));

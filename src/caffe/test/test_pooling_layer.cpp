@@ -419,9 +419,9 @@ TYPED_TEST(PoolingLayerTest, TestSetupBinPooling) {
   LayerParameter layer_param;
   PoolingParameter* pooling_param = layer_param.mutable_pooling_param();
   pooling_param->set_pool(PoolingParameter_PoolMethod_AVE);
-  for (int bin_h = 1; bin_h <= this->blob_bottom_->height(); ++bin_h) {
+  for (int bin_h = 1; bin_h <= this->blob_bottom_->height()/2; ++bin_h) {
     pooling_param->set_bin_h(bin_h);
-    for (int bin_w = 1; bin_w <= this->blob_bottom_->width(); ++bin_w) {
+    for (int bin_w = 1; bin_w <= this->blob_bottom_->width()/2; ++bin_w) {
       pooling_param->set_bin_w(bin_w);
       PoolingLayer<Dtype> layer(layer_param);
       layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
