@@ -19,12 +19,13 @@ Please cite ParseNet in your publications if it helps your research:
 
 ### Contents
 1. [Installation](#installation)
-2. [Demo](#demo)
+2. [Model](#model)
 
 ### Installation
 1. Get the code
   ```Shell
-  git clone https://github.com/weiliu89/caffe/tree/fcn
+  git clone https://github.com/weiliu89/caffe.git
+  git checkout fcn
   ```
 
 2. Build the code. Please follow [Caffe instruction](http://caffe.berkeleyvision.org/installation.html) to install all necessary packages and build it.
@@ -39,3 +40,6 @@ Please cite ParseNet in your publications if it helps your research:
   **Note:** Since ParseNet merges [#2016](https://github.com/BVLC/caffe/pull/2016), which will cause a crash on exit. You can safely ignore it as it is a known side effect.
 
     syncedmem.cpp:16] Check failed: error == cudaSuccess (29 vs. 0) driver shutting down
+
+### Model
+The ParseNet model and solver on PASCAL has been shared at the [Caffe's Model Zoo](https://github.com/BVLC/caffe/wiki/Model-Zoo). Please check it out for more details.
