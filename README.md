@@ -25,6 +25,7 @@ Please cite ParseNet in your publications if it helps your research:
 1. Get the code
   ```Shell
   git clone https://github.com/weiliu89/caffe.git
+  cd caffe
   git checkout fcn
   ```
 
