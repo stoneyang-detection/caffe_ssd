@@ -2,9 +2,9 @@
 # Create the classification $DB_TYPE inputs
 # N.B. set the path to the dataset train + val data dirs
 
-if [ $# -gt 8 ] || [ $# -lt 3 ]
+if [ $# -gt 9 ] || [ $# -lt 3 ]
 then
-  echo "Usage: $0 ROOTDIR name dataset [DB=lmdb] [shuffle=0] [resize=0] [check_size=1] [gray=0]"
+  echo "Usage: $0 ROOTDIR name dataset [DB=lmdb] [shuffle=0] [resize=0] [check_size=1] [gray=0] [encoded=0]"
   exit
 fi
 
@@ -35,6 +35,11 @@ gray=0
 if [ $# -ge 8 ]
 then
   gray=$8
+fi
+encoded=0
+if [ $# -ge 9 ]
+then
+  encoded=$9
 fi
 
 EXAMPLE=$ROOTDIR/$name/$DB_TYPE
@@ -81,6 +86,7 @@ GLOG_logtostderr=1 $TOOLS/convert_imageset \
     --check_size=$check_size \
     --gray=$gray \
     --backend=$DB_TYPE \
+    --encoded=$encoded \
     $DATA_ROOT \
     $DATA/$dataset.txt \
     $EXAMPLE/"$name"_"$dataset"_$DB_TYPE
