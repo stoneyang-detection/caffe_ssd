@@ -252,7 +252,7 @@ with open(job_file, 'w') as f:
   f.write('--weights="{}" \\\n'.format(pretrain_model))
   f.write('--iterations="{}" \\\n'.format(test_iter))
   if solver_mode == P.Solver.GPU:
-    f.write('--gpu {}\n'.format(gpus))
+    f.write('--gpu {} 2>&1 | tee {}/{}.log\n'.format(gpus, job_dir, model_name))
 
 # Copy the python script to job_dir.
 py_file = os.path.abspath(__file__)
